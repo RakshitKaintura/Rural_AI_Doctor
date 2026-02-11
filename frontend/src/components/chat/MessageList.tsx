@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ChatBubble } from './ChatBubble';
-import { Message } from '@/src/types/chat';
+import { Message } from '@/types/chat';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot,Loader2 } from 'lucide-react';
 

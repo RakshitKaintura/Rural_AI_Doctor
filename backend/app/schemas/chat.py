@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 class ChatMessage(BaseModel):
-    role: str  # "user" or "assistant"
+    role: str  
     content: str
 
 

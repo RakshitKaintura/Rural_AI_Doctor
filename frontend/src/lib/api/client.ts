@@ -8,10 +8,10 @@ const apiClient = axios.create({
   timeout: 30000,
 });
 
-// Request interceptor
+
 apiClient.interceptors.request.use(
   (config) => {
-    // Add auth token if available
+  
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -21,7 +21,7 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

@@ -3,10 +3,10 @@
 import { Card } from '@/components/ui/card';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
-import { useChat } from '@/src/hooks/useChat';
+import { useChat } from '@/hooks/useChat';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
-import { useChatStore } from '@/src/store/chatStore';
+import { useChatStore } from '@/store/chatStore';
 
 export function ChatInterface() {
   const { messages, isLoading, error, sendMessage } = useChat();
