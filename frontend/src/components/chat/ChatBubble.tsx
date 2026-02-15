@@ -15,7 +15,7 @@ export function ChatBubble({ message }: ChatBubbleProps) {
       isUser ? 'flex-row-reverse' : 'flex-row'
     )}>
       <div className={cn(
-        'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
+        'shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
         isUser ? 'bg-blue-500' : 'bg-green-500'
       )}>
         {isUser ? (

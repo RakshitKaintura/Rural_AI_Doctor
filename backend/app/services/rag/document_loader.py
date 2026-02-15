@@ -1,6 +1,6 @@
 from typing import List, Dict, Optional
 from pathlib import Path
-import pymupdf4llm  # 2026 Standard for structure-aware PDF parsing
+import pymupdf4llm 
 import docx
 from app.core.config import settings
 
@@ -11,8 +11,6 @@ class DocumentLoader:
         Load PDF and extract as Markdown to preserve clinical document structure.
         """
         try:
-            # 2026 Update: Extracts text while preserving tables and headers as Markdown.
-            # This significantly reduces hallucinations during vector search.
             md_text = pymupdf4llm.to_markdown(file_path)
             
             return {
@@ -31,9 +29,6 @@ class DocumentLoader:
         """Load DOCX and extract clean text chunks."""
         try:
             doc = docx.Document(file_path)
-            
-            # 2026 Optimization: Filter out empty paragraphs often found in 
-            # medical templates to save on embedding tokens.
             paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
             text = "\n\n".join(paragraphs)
             
@@ -53,7 +48,6 @@ class DocumentLoader:
         """Load TXT file with robust UTF-8 handling."""
         try:
             path = Path(file_path)
-            # Standardizing on pathlib for all OS compatibility
             text = path.read_text(encoding='utf-8')
             
             return {
@@ -70,8 +64,6 @@ class DocumentLoader:
     def load_document(cls, file_path: str) -> Dict:
         """Auto-detect and load document based on file extension."""
         ext = Path(file_path).suffix.lower()
-        
-        # Mapping loaders for cleaner 2026-style dispatching
         loaders = {
             '.pdf': cls.load_pdf,
             '.docx': cls.load_docx,
@@ -91,7 +83,6 @@ class DocumentLoader:
         documents = []
         directory = Path(directory_path)
         
-        # Supported extensions for the 2026 RAG pipeline
         valid_extensions = {'.pdf', '.docx', '.txt'}
         
         for file_path in directory.rglob("*"):
@@ -100,10 +91,8 @@ class DocumentLoader:
                     doc = cls.load_document(str(file_path))
                     documents.append(doc)
                 except Exception as e:
-                    # Logging the error but continuing with other files
                     print(f"Error loading {file_path.name}: {e}")
         
         return documents
 
-# Singleton for application-wide use
 document_loader = DocumentLoader()

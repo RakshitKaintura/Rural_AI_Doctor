@@ -11,25 +11,23 @@ class TextChunker:
         """
         Initialize the chunker with Markdown-aware separators for 2026 RAG standards.
         """
-        # 2026 Update: We added Markdown specific separators.
-        # This ensures that if a medical document has a header like "### Side Effects",
-        # the splitter tries to keep that header and its content in one chunk.
+    
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len,
             separators=[
-                "\n# ",   # H1 Headers
-                "\n## ",  # H2 Headers
-                "\n### ", # H3 Headers
-                "\n\n",   # Paragraphs
-                "\n",     # Lines
-                ". ",     # Sentences
-                "! ",     # Important warnings
-                "? ",     # Clinical questions
-                "• ",     # Bullet points
-                " ",      # Words
-                ""        # Characters
+                "\n# ", 
+                "\n## ",  
+                "\n### ", 
+                "\n\n",   
+                "\n",   
+                ". ",     
+                "! ",     
+                "? ",    
+                "• ",     
+                " ",     
+                ""      
             ]
         )
     
@@ -47,7 +45,6 @@ class TextChunker:
                     **(metadata or {}),
                     "chunk_index": i,
                     "total_chunks": len(chunks),
-                    # Useful for filtering out 'empty' or tiny noise chunks
                     "char_count": len(chunk) 
                 }
             }
@@ -66,11 +63,9 @@ class TextChunker:
             text = doc.get("text", "")
             metadata = doc.get("metadata", {})
             
-            # Use the internal chunk_text logic to process each doc
             chunks = self.chunk_text(text, metadata)
             all_chunks.extend(chunks)
         
         return all_chunks
 
-# Singleton for application-wide consistency
 text_chunker = TextChunker()

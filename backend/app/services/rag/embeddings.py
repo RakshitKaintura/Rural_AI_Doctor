@@ -7,8 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Initialize the 2026 SDK Client
-# We use v1beta as it has the broadest support for the 'embed_content' method
+
 client = genai.Client(
     api_key=settings.GOOGLE_API_KEY,
     http_options=types.HttpOptions(api_version="v1beta")
@@ -16,9 +15,8 @@ client = genai.Client(
 
 class EmbeddingService:
     def __init__(self):
-        # Your check.py output was 'models/gemini-embedding-001'
-        # We use the full string here to match your key's specific permissions
-        self.model_name = "models/gemini-embedding-001"
+        
+        self.model_name = "models/gemini-embedding-004"
         self.dimensions = 768
 
     def _get_embedding(self, text: str, task_type: str) -> List[float]:

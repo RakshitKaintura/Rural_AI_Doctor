@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     VERTEX_AI_LOCATION: str = "us-central1"
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
     
+    GEMINI_MODEL: str = 'gemini-2.5-flash' 
    
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200

@@ -11,7 +11,6 @@ import { ragAPI, RAGQueryResponse } from '@/lib/api/rag';
 import axios from 'axios';
 
 export function KnowledgeSearch() {
-
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<RAGQueryResponse | null>(null);
@@ -23,20 +22,18 @@ export function KnowledgeSearch() {
     try {
       setLoading(true);
       setError(null);
-      
-    
-      const data = await ragAPI.query(question);
+ 
+      const data = await ragAPI.query(String(question), 5);
       setResult(data);
       
     } catch (err: any) {
       console.error("Search Error:", err);
       
-      
       if (axios.isAxiosError(err) && err.response?.status === 422) {
         const details = err.response.data.detail;
        
         const formattedError = Array.isArray(details) 
-          ? details.map((e: any) => `${e.loc.join('.')}: ${e.msg}`).join(', ')
+          ? details.map((e: any) => `${e.loc[e.loc.length - 1]}: ${e.msg}`).join(', ')
           : "Invalid request format sent to server.";
         
         setError(formattedError);
@@ -58,7 +55,7 @@ export function KnowledgeSearch() {
 
   return (
     <div className="space-y-4">
-     
+      {/* Search Bar Section */}
       <Card className="p-4 border-slate-200 shadow-sm">
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -69,13 +66,13 @@ export function KnowledgeSearch() {
               onKeyPress={handleKeyPress}
               placeholder="Ask a medical question (e.g., 'What is the treatment for pneumonia?')"
               disabled={loading}
-              className="pl-10 h-11 bg-slate-50 border-slate-200 focus:bg-white transition-all"
+              className="pl-10 h-11 bg-slate-50 border-slate-200 focus:bg-white transition-all shadow-none"
             />
           </div>
           <Button 
             onClick={handleSearch} 
             disabled={loading || !question.trim()}
-            className="h-11 px-6 bg-blue-600 hover:bg-blue-700 transition-colors"
+            className="h-11 px-6 bg-blue-600 hover:bg-blue-700 transition-colors shrink-0"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -93,7 +90,7 @@ export function KnowledgeSearch() {
         </p>
       </Card>
 
-
+      {/* Error Feedback Section */}
       {error && (
         <Card className="p-4 border-red-200 bg-red-50 flex items-start gap-3 animate-in fade-in zoom-in duration-200">
           <XCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
@@ -104,8 +101,10 @@ export function KnowledgeSearch() {
         </Card>
       )}
 
+      {/* RAG Result Rendering */}
       {result && (
         <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          {/* Main AI Answer Card */}
           <Card className="p-6 border-slate-200 shadow-md bg-white">
             <div className="flex items-start gap-3 mb-5">
               <div className="p-2.5 bg-blue-50 rounded-xl border border-blue-100">
@@ -118,13 +117,16 @@ export function KnowledgeSearch() {
                 </p>
               </div>
             </div>
-           <ScrollArea className="max-h-[600px] pr-4 pb-8"> {/* Added pb-8 for breathing room */}
-  <div className="text-slate-700 whitespace-pre-wrap leading-relaxed pb-6">
-    {result.answer}
-  </div>
-</ScrollArea>
+            
+            {/* Scrollable area for deep clinical responses */}
+            <ScrollArea className="max-h-[600px] pr-4">
+              <div className="text-slate-700 whitespace-pre-wrap leading-relaxed pb-6 text-base">
+                {result.answer}
+              </div>
+            </ScrollArea>
           </Card>
 
+          {/* Citation / Source Evidence Section */}
           {result.sources && result.sources.length > 0 && (
             <Card className="p-6 border-slate-200 shadow-sm bg-slate-50/50">
               <h3 className="text-sm font-bold text-slate-500 mb-4 flex items-center gap-2 uppercase tracking-tight">
@@ -167,7 +169,7 @@ export function KnowledgeSearch() {
             </Card>
           )}
 
-   
+          
           {(!result.sources || result.sources.length === 0) && (
             <Card className="p-4 bg-amber-50 border-amber-200 flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />

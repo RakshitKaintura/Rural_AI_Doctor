@@ -12,7 +12,7 @@ export function useChat() {
       setError(null);
       setLoading(true);
 
-      // Add user message immediately
+      
       const userMessage: Message = {
         id: Date.now().toString(),
         role: 'user',
@@ -21,7 +21,7 @@ export function useChat() {
       };
       addMessage(userMessage);
 
-      // Prepare request
+      
       const request = {
         messages: [
           ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -30,15 +30,15 @@ export function useChat() {
         session_id: sessionId || undefined,
       };
 
-      // Send to backend
+      
       const response = await chatAPI.sendMessage(request);
 
-      // Update session ID if new
+      
       if (!sessionId) {
         setSessionId(response.session_id);
       }
 
-      // Add assistant message
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',

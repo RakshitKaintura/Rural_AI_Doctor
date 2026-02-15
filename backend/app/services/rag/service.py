@@ -3,13 +3,10 @@ from google import genai
 from google.genai import types
 from app.services.rag.embeddings import embedding_service
 from app.core.config import settings
-
-# Initialize the 2026 Gemini Client
 client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
 class RAGService:
     def __init__(self):
-        # Clean the connection string for psycopg (removes the +psycopg prefix if present)
         self.db_url = settings.DATABASE_URL.replace("postgresql+psycopg://", "postgresql://")
         self.model_id = "gemini-2.5-flash-lite"
 
@@ -21,7 +18,6 @@ class RAGService:
         try:
             with psycopg.connect(self.db_url) as conn:
                 with conn.cursor() as cur:
-                    # We fetch the top result based on the TOP_K_RESULTS setting
                     cur.execute("""
                         SELECT content, title FROM medical_documents
                         ORDER BY embedding <=> %s::vector 
@@ -32,7 +28,6 @@ class RAGService:
                     if not rows:
                         return None, None
                     
-                    # Combine multiple chunks if found
                     combined_context = "\n\n".join([row[0] for row in rows])
                     sources = ", ".join(list(set([row[1] for row in rows])))
                     return combined_context, sources
@@ -47,16 +42,14 @@ class RAGService:
         2. Embedding -> Vector Search (Context)
         3. Context + Query -> Gemini 2.5-Flash-Lite
         """
-        # Step 1: Generate Embedding for the user's question
+
         vector = embedding_service.embed_query(user_query)
         
-        # Step 2: Retrieve relevant medical context
         context_text, source_titles = self.get_context(vector)
         
         if not context_text:
             return "I'm sorry, I don't have enough information in my medical database to answer that accurately. Please consult a doctor."
 
-        # Step 3: Craft the professional prompt
         prompt = f"""
         ROLE: You are an expert Rural Doctor AI.
         STRICT RULE: Answer the question using ONLY the provided medical context.
@@ -76,7 +69,6 @@ class RAGService:
         DOCTOR AI RESPONSE:
         """
 
-        # Step 4: Call Gemini 2.5-Flash-Lite
         try:
             response = client.models.generate_content(
                 model=self.model_id,
@@ -90,5 +82,4 @@ class RAGService:
         except Exception as e:
             return f"I encountered an error while processing your request: {str(e)}"
 
-# Create a singleton instance to be used by the API routes
 rag_service = RAGService()

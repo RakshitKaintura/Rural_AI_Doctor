@@ -20,27 +20,24 @@ class DocumentIndexer:
         Returns:
             Number of chunks successfully indexed.
         """
-        # 1. Load document (Now extracting structured Markdown in 2026)
+       
         doc = document_loader.load_document(file_path)
         
-        # 2. Merge custom and extracted metadata
+       
         if custom_metadata:
             doc["metadata"].update(custom_metadata)
         
-        # 3. Create Chunks (Markdown-aware in 2026)
+        
         chunks = text_chunker.chunk_text(doc["text"], doc["metadata"])
         
         indexed_count = 0
         
-        # 4. Process chunks and prepare for database ingestion
+       
         for chunk in chunks:
             try:
-                # Generate embedding (returns List[float])
-                # Using the latest 2026 embedding model
+               
                 embedding = embedding_service.embed_query(chunk["text"])
-                
-                # Create database entry
-                # Note: metadata_json is the field name used in the model
+             
                 med_doc = MedicalDocument(
                     title=f"{doc['metadata']['source']} - Chunk {chunk['metadata']['chunk_index']}",
                     content=chunk["text"],
@@ -51,18 +48,16 @@ class DocumentIndexer:
                 db.add(med_doc)
                 indexed_count += 1
                 
-                # 2026 Batching Optimization: Commit every 50 chunks 
-                # to prevent memory bloating during heavy medical library indexing.
+           
                 if indexed_count % 50 == 0:
                     db.commit()
             
             except Exception as e:
-                # Log error and rollback the failed chunk to keep session healthy
+                
                 db.rollback()
                 print(f"Error indexing chunk {chunk['metadata']['chunk_index']} of {file_path}: {e}")
                 continue
         
-        # Final commit for remaining chunks
         db.commit()
         return indexed_count
 
@@ -85,7 +80,6 @@ class DocumentIndexer:
             "failed": []
         }
         
-        # 2026 Supported extensions
         valid_extensions = {'.pdf', '.docx', '.txt'}
         
         for file_path in directory.rglob("*"):
@@ -121,6 +115,4 @@ class DocumentIndexer:
             db.rollback()
             print(f"Error clearing index: {e}")
 
-
-# Singleton instance
 document_indexer = DocumentIndexer()
