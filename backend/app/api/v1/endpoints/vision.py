@@ -15,21 +15,6 @@ from typing import Optional
 import json
 
 router = APIRouter()
-from fastapi.responses import StreamingResponse
-from app.services.pdf_service import pdf_service
-
-@router.get("/analysis/{analysis_id}/pdf")
-async def download_analysis_pdf(analysis_id: int, db: Session = Depends(get_db)):
-    analysis = db.query(ImageAnalysis).filter(ImageAnalysis.id == analysis_id).first()
-    if not analysis:
-        raise HTTPException(status_code=404, detail="Report not found")
-    
-    pdf_buffer = pdf_service.generate_medical_report(analysis)
-    return StreamingResponse(
-        pdf_buffer, 
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=report_{analysis_id}.pdf"}
-    )
 
 @router.post("/analyze", response_model=ImageAnalysisResponse)
 async def analyze_medical_image(

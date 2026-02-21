@@ -16,7 +16,7 @@ client = genai.Client(
 class EmbeddingService:
     def __init__(self):
         
-        self.model_name = "models/gemini-embedding-004"
+        self.model_name = "models/text-embedding-004"
         self.dimensions = 768
 
     def _get_embedding(self, text: str, task_type: str) -> List[float]:
@@ -25,7 +25,7 @@ class EmbeddingService:
             if not clean_text:
                 return []
 
-            # 2026 embed_content call
+        
             response = client.models.embed_content(
                 model=self.model_name,
                 contents=clean_text,

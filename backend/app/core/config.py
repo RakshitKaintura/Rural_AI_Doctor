@@ -2,14 +2,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 class Settings(BaseSettings):
-    # App Information
+   
     PROJECT_NAME: str = "Rural AI Doctor"
     VERSION: str = "0.1.0"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = True
     
     
-    DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@localhost:5434/rural_ai_doctor"
+    DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@127.0.0.1:5434/rural_ai_doctor"
     
   
     GOOGLE_API_KEY: str = ""
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="ignore" # This allows extra vars in .env without crashing, but won't add them to 'settings'
+        extra="ignore"
     )
 
 

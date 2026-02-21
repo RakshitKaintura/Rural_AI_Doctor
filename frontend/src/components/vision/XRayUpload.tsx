@@ -269,7 +269,7 @@ export function XRayUpload() {
           {result.urgent_flags && result.urgent_flags.length > 0 && (
             <Card className="p-4 bg-red-50 border-red-200">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-semibold text-red-900 mb-2">Urgent Attention Required</h4>
                   {result.urgent_flags.map((flag, idx) => (

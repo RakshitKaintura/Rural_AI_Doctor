@@ -32,7 +32,7 @@ class RAGService:
                     sources = ", ".join(list(set([row[1] for row in rows])))
                     return combined_context, sources
         except Exception as e:
-            print(f"❌ Database Retrieval Error: {e}")
+            print(f" Database Retrieval Error: {e}")
             return None, None
 
     async def answer_question(self, user_query: str):

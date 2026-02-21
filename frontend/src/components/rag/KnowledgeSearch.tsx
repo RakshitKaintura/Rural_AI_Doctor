@@ -119,7 +119,7 @@ export function KnowledgeSearch() {
             </div>
             
             {/* Scrollable area for deep clinical responses */}
-            <ScrollArea className="max-h-[600px] pr-4">
+            <ScrollArea className="max-h-150 pr-4">
               <div className="text-slate-700 whitespace-pre-wrap leading-relaxed pb-6 text-base">
                 {result.answer}
               </div>

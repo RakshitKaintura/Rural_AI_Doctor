@@ -30,7 +30,7 @@ export function ChatBubble({ message }: ChatBubbleProps) {
         isUser ? 'items-end' : 'items-start'
       )}>
         <div className={cn(
-          'rounded-lg px-4 py-2 break-words',
+          'rounded-lg px-4 py-2 wrap-break-words',
           isUser
             ? 'bg-blue-500 text-white'
             : 'bg-gray-100 text-gray-900'
