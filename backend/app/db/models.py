@@ -1,11 +1,10 @@
 from datetime import datetime
 from typing import List, Optional, Any
-from sqlalchemy import String, Text, Float, DateTime, ForeignKey, JSON
+from sqlalchemy import String, Text, Float, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
-
 
 class Base(DeclarativeBase):
     pass
@@ -105,6 +104,27 @@ class ImageAnalysis(Base):
     confidence: Mapped[float]
     severity: Mapped[str]
     recommendations: Mapped[Optional[str]] = mapped_column(Text)
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now()
+    )
+
+class VoiceInteraction(Base):
+    __tablename__ = "voice_interactions"
+    
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String(255), index=True)
+    audio_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    transcription: Mapped[Optional[str]] = mapped_column(Text)
+    language: Mapped[str] = mapped_column(String(10), default="en")
+    duration_seconds: Mapped[Optional[float]]
+    confidence: Mapped[Optional[float]] # From Faster-Whisper probability
+    
+    patient_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("patients.id", ondelete="SET NULL"), 
+        index=True
+    )
     
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 

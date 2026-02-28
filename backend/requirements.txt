@@ -28,10 +28,18 @@ unstructured
 tiktoken
 sentence-transformers
 
-# IMAGE PROCESSING
+# Image Processing
 pillow
 opencv-python
 numpy
+
+# Voice Processing (New)
+faster-whisper
+pydub
+soundfile
+ffmpeg-python
+gtts
+elevenlabs
 
 # Utilities & Testing
 python-dotenv

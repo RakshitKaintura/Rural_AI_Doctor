@@ -4,6 +4,7 @@ from app.services.agents.state import AgentState
 from app.services.llm.gemini_client import gemini_client
 from app.services.rag.retriever import vector_retriever
 from app.db.session import SessionLocal
+from app.schemas.agents import DiagnosisResponse
 
 class DiagnosisAssessment(BaseModel):
     """Structured schema for clinical diagnosis and reasoning."""
@@ -20,7 +21,7 @@ async def diagnostician_node(state: AgentState) -> AgentState:
     Diagnostician: Orchestrates RAG and multimodal evidence to generate a final diagnosis.
     Includes defensive programming to prevent crashes if previous nodes fail.
     """
-
+    raw_text = state.get('transcription') or state.get('symptoms') or "No symptoms provided"
 
     analysis = state.get('symptom_analysis') or {}
     vision = state.get('image_analysis') or {}
@@ -45,7 +46,7 @@ async def diagnostician_node(state: AgentState) -> AgentState:
 
 
     query_terms = analysis.get('primary_symptoms', []) + vision.get('clinical_findings', [])
-    search_query = " ".join(query_terms) if query_terms else state.get('symptoms', "")
+    search_query = " ".join(query_terms) if query_terms else raw_text
 
     retrieved_docs = []
     rag_text = "No specific medical guidelines found in local database."
