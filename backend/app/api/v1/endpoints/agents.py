@@ -23,10 +23,7 @@ async def multi_agent_diagnosis(
     request: DiagnosisRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Executes the clinical LangGraph workflow.
-    Fixes the 'AIMessage' object has no attribute 'get' error by using polymorphic message parsing.
-    """
+  
     try:
         image_analysis_data = None
         if request.image_analysis_id:

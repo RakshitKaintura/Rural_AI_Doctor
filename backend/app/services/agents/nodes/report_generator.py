@@ -10,12 +10,6 @@ def format_section(title: str, content: List[str]) -> str:
     return f"{header}{body}\n\n"
 
 async def report_generator_node(state: AgentState) -> AgentState:
-    """
-    Generate a comprehensive, structured medical report.
-    This node compiles data from Triage, Symptom Analysis, Vision, and Diagnosis agents.
-    """
-    
-    # Retrieve data from shared state
     triage = state.get('triage_result', {})
     symptoms = state.get('symptom_analysis', {})
     diagnosis = state.get('diagnosis', {})

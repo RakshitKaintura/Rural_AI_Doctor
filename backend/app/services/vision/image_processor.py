@@ -29,12 +29,12 @@ class ImageProcessor:
         Returns:
             (is_valid, error_message)
         """
-        # Check file size
+        
         if len(image_data) > ImageProcessor.MAX_FILE_SIZE:
             return False, "Image too large (max 10MB)"
         
         try:
-            # Try to open image
+    
             image = Image.open(io.BytesIO(image_data))
             
             # Check format
@@ -68,10 +68,10 @@ class ImageProcessor:
         Returns:
             Preprocessed image bytes
         """
-        # Load image
+    
         image = Image.open(io.BytesIO(image_data))
         
-        # Convert to RGB if necessary (strips Alpha channel for Gemini)
+    
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
@@ -79,20 +79,20 @@ class ImageProcessor:
         if target_size:
             image = image.resize(target_size, Image.Resampling.LANCZOS)
         else:
-            # Limit max dimension while maintaining aspect ratio
+           
             width, height = image.size
             if max(width, height) > ImageProcessor.MAX_DIMENSION:
                 ratio = ImageProcessor.MAX_DIMENSION / max(width, height)
                 new_size = (int(width * ratio), int(height * ratio))
                 image = image.resize(new_size, Image.Resampling.LANCZOS)
         
-        # Apply enhancement if requested
+       
         if enhance:
             image = ImageProcessor._enhance_medical_image(image)
         
-        # Convert back to bytes
+       
         output = io.BytesIO()
-        # Quality 95 and subsampling=0 preserves high-frequency detail for skin/X-ray analysis
+        
         image.save(output, format='JPEG', quality=95, subsampling=0)
         output.seek(0)
         
@@ -104,29 +104,28 @@ class ImageProcessor:
         Apply medical image enhancement using CLAHE.
         Optimized for Numpy 2.2 and Gemini 2.5 vision encoders.
         """
-        # Convert PIL to OpenCV using the 2026 asarray standard
+      
         img_array = np.asarray(image)
         
-        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+       
         if len(img_array.shape) == 3:
-            # Convert to LAB color space to enhance luminosity only
+           
             lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
             l, a, b = cv2.split(lab)
             
-            # ClipLimit 1.5 is the 2026 sweet spot for Gemini 2.5
-            # Prevents over-sharpening noise while highlighting clinical opacities
+           
             clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
             l = clahe.apply(l)
             
-            # Merge channels back
+     
             enhanced = cv2.merge([l, a, b])
             enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2RGB)
         else:
-            # Grayscale processing
+        
             clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
             enhanced = clahe.apply(img_array)
         
-        # Convert back to PIL
+       
         return Image.fromarray(enhanced)
     
     @staticmethod
@@ -145,5 +144,5 @@ class ImageProcessor:
         }
 
 
-# Singleton instance
+
 image_processor = ImageProcessor()

@@ -8,11 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 logger = logging.getLogger(__name__)
 
 class TTSService:
-    """
-    Modern Text-to-Speech Service for the Rural AI Doctor.
-    Optimized for streaming and non-blocking I/O.
-    """
-    
+
     SUPPORTED_LANGUAGES = {
         "en": "English", "hi": "Hindi", "es": "Spanish",
         "zh": "Chinese", "fr": "French", "de": "German",
@@ -22,7 +18,7 @@ class TTSService:
     }
 
     def __init__(self):
-        # Thread pool to run the synchronous gTTS in a separate thread
+        
         self.executor = ThreadPoolExecutor(max_workers=3)
 
     async def text_to_speech_async(
@@ -58,10 +54,7 @@ class TTSService:
         language: str = "en", 
         chunk_size: int = 1024
     ) -> AsyncGenerator[bytes, None]:
-        """
-        Async generator to stream audio chunks.
-        Perfect for FastAPI StreamingResponse.
-        """
+     
         audio_data = await self.text_to_speech_async(text, language)
         audio_io = io.BytesIO(audio_data)
         
@@ -70,11 +63,11 @@ class TTSService:
             if not chunk:
                 break
             yield chunk
-            await asyncio.sleep(0) # Yield control back to event loop
+            await asyncio.sleep(0)
 
     def get_supported_languages(self) -> Dict[str, str]:
-        """Get supported language mapping."""
+    
         return self.SUPPORTED_LANGUAGES
 
-# Singleton instance
+
 tts_service = TTSService()

@@ -14,14 +14,12 @@ logger = logging.getLogger(__name__)
 
 class WhisperService:
     def __init__(self, model_size: str = "base"):
-        """
-        Initialize Whisper model on CPU/GPU.
-        """
+     
         self.model_size = model_size
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         logger.info(f"🎙️ Loading Whisper model ({model_size}) on {self.device}...")
-        # fp16=False is required for CPU execution to prevent warnings/errors
+       
         self.model = whisper.load_model(model_size, device=self.device)
         logger.info(f"✅ Whisper model loaded successfully")
 
@@ -39,14 +37,12 @@ class WhisperService:
         session_id: Optional[str] = None,
         patient_id: Optional[int] = None
     ) -> VoiceInteraction:
-        """
-        Full workflow: Convert -> Transcribe -> Save to DB
-        """
+    
         try:
-            # 1. Standardize and Transcribe
+            #  Standardize and Transcribe
             result = self._process_audio(audio_data)
             
-            # 2. Create Database Record
+            #  Create Database Record
             voice_entry = VoiceInteraction(
                 session_id=session_id,
                 patient_id=patient_id,
@@ -65,7 +61,7 @@ class WhisperService:
             
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Voice Service Error: {str(e)}")
+            logger.error(f" Voice Service Error: {str(e)}")
             raise e
 
     def _process_audio(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
@@ -74,15 +70,15 @@ class WhisperService:
         tmp_path = tmp.name
         
         try:
-            # 2. Standardize audio
+            #  Standardize audio
             audio = AudioSegment.from_file(io.BytesIO(audio_data))
             audio = audio.set_frame_rate(16000).set_channels(1)
             
-            # 3. Export and immediately CLOSE the handle so Windows releases the lock
+            #  Export and immediately CLOSE the handle so Windows releases the lock
             audio.export(tmp_path, format="wav")
             tmp.close() 
 
-            # 4. Now Whisper can safely open the file
+            #  Now Whisper can safely open the file
             result = self.model.transcribe(
                 tmp_path, 
                 language=language,
@@ -96,7 +92,7 @@ class WhisperService:
                 "confidence": self._calculate_confidence(result["segments"])
             }
         finally:
-            # 5. Manually cleanup once everything is done
+            # Manually cleanup once everything is done
             try:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
@@ -109,9 +105,8 @@ class WhisperService:
         # Lower no_speech_prob means higher confidence in the transcription
         return sum(1.0 - s.get('no_speech_prob', 0) for s in segments) / len(segments)
 
-# --- SINGLETON AND FACTORY ---
 
-# Initialize the instance once when the app starts
+
 _whisper_instance = WhisperService(model_size="base")
 
 def get_whisper_service(model_size: str = "base"):
@@ -124,5 +119,4 @@ def get_whisper_service(model_size: str = "base"):
         _whisper_instance = WhisperService(model_size=model_size)
     return _whisper_instance
 
-# Also export the instance directly for convenience
 whisper_service = _whisper_instance

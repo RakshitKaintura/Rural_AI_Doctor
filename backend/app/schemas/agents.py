@@ -23,7 +23,7 @@ class TreatmentPlanSchema(BaseModel):
     referral_needed: bool
 
 class DiagnosisRequest(BaseModel):
-    """Input schema for triggering the medical agentic workflow."""
+    
     symptoms: str = Field(..., min_length=5, description="Raw symptoms description from the patient")
     age: Optional[int] = Field(None, ge=0, le=120)
     gender: Optional[str] = Field(None, pattern="^(Male|Female|Other|Prefer not to say)$")

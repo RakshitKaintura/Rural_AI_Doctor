@@ -29,10 +29,6 @@ class TreatmentPlan(BaseModel):
 
 
 async def treatment_planner_node(state:AgentState)->AgentState:
-    """
-    Treatment Planner: Generates a structured clinical plan based on diagnosis.
-    Ensures plans are practical for rural settings with limited specialist access.
-    """
     diagnosis=state.get('diagnosis',{})
     primary_dx=diagnosis.get('primary_diagnosis',"Unknown Condition")
 

@@ -1,7 +1,3 @@
-"""
-Gemini Vision Service for Medical Image Analysis
-Uses Gemini 2.0 Flash multimodal capabilities
-"""
 
 from google import genai
 from google.genai.types import GenerateContentConfig, Part
@@ -45,15 +41,12 @@ class GeminiVisionService:
         # Create prompt based on image type
         prompt = self._create_analysis_prompt(image_type, additional_context)
         
-        # Configure generation
         config = types.GenerateContentConfig(
             temperature=0.1, 
             max_output_tokens=2048,
             top_p=0.95
         )
-        
-        # Create multimodal content
-        # Create multimodal content using the keyword 'text'
+
         contents = [
             types.Part.from_text(text=prompt), # Corrected positional argument error
             types.Part.from_bytes(
@@ -69,7 +62,7 @@ class GeminiVisionService:
             config=config
         )
         
-        # Parse and structure response
+     
         analysis = self._parse_analysis_response(response.text, image_type)
         
         return analysis
@@ -224,5 +217,4 @@ Analyze:
         return '\n'.join(recommendations[:5]) if recommendations else "Consult with physician"
 
 
-# Singleton
 gemini_vision = GeminiVisionService()

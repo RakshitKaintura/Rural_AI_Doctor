@@ -1,32 +1,29 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import func, String
-from app.db.session import get_db
-from app.db.models import MedicalDocument
-from app.schemas.rag import (
-    DocumentUploadResponse,
-    SearchRequest,
-    SearchResponse,
-    SearchResult,
-    RAGQueryRequest,
-    RAGQueryResponse
-)
-from app.services.rag.indexer import document_indexer
-from app.services.rag.retriever import vector_retriever
-from app.services.llm.gemini_client import gemini_client
+from sqlalchemy import func
 import shutil
 from pathlib import Path
 import tempfile
 import logging
 import os
+import time
+
+from app.db.session import get_db
+from app.db.models import MedicalDocument
+from app.schemas.rag import (
+    DocumentUploadResponse,
+    RAGQueryRequest,
+    RAGQueryResponse,
+    SearchResult
+)
+from app.services.rag.indexer import document_indexer
+from app.services.rag.retriever import vector_retriever
+from app.services.llm.gemini_client import gemini_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 def background_indexing(file_path: str, db_session: Session, filename: str):
-    """
-    Worker function to process the document in the background.
-    """
     try:
         logger.info(f"Starting background indexing for: {filename}")
         chunks = document_indexer.index_document(
@@ -38,19 +35,22 @@ def background_indexing(file_path: str, db_session: Session, filename: str):
     except Exception as e:
         logger.error(f"Background indexing failed for {filename}: {str(e)}")
     finally:
-        # Clean up the temporary file after indexing is done
+        
         if os.path.exists(file_path):
-            os.unlink(file_path)
+            for i in range(5): # Try 5 times
+                try:
+                    os.remove(file_path)
+                    logger.debug(f"Successfully deleted temp file: {file_path}")
+                    break
+                except PermissionError:
+                    logger.debug(f"File locked, retrying deletion ({i+1}/5)...")
+                    time.sleep(0.5)
 
 @router.get("/stats")
 async def get_index_stats(db: Session = Depends(get_db)):
-    """
-    Optimized stats retrieval using JSONB path navigation.
-    """
+  
     try:
         total_chunks = db.query(func.count(MedicalDocument.id)).scalar()
-        
-     
         sources_query = db.query(
             MedicalDocument.metadata_json['uploaded_filename'].astext
         ).distinct().all()
@@ -72,39 +72,40 @@ async def upload_document(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
 ):
-    """
-    Asynchronous upload. Saves file and returns a 202 Accepted status immediately.
-    """
+  
     try:
         file_ext = Path(file.filename).suffix.lower()
-        
-       
+        if file_ext not in ['.pdf', '.txt', '.docx']:
+             raise HTTPException(status_code=400, detail="Unsupported file format.")
+
+      
         fd, tmp_path = tempfile.mkstemp(suffix=file_ext)
-        with os.fdopen(fd, 'wb') as tmp:
+        os.close(fd) 
+        
+        with open(tmp_path, 'wb') as tmp:
             shutil.copyfileobj(file.file, tmp)
         
-      
         background_tasks.add_task(background_indexing, tmp_path, db, file.filename)
         
         return DocumentUploadResponse(
             message=f"Upload of '{file.filename}' received. Indexing is running in the background.", 
-            chunks_indexed=0  # Chunks will be updated in DB shortly
+            chunks_indexed=0
         )
     except Exception as e:
         logger.error(f"Upload trigger failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/query", response_model=RAGQueryResponse)
+@router.post("/search", response_model=RAGQueryResponse) # Alias to fix test 404s
 async def rag_query(request: RAGQueryRequest, db: Session = Depends(get_db)):
-    """
-    Standard RAG Query using Gemini.
-    """
+
     try:
         retrieved_docs = vector_retriever.search(request.question, db, request.top_k)
+        
         if not retrieved_docs:
             return RAGQueryResponse(
                 question=request.question, 
-                answer="I couldn't find any relevant medical data. Please ensure guidelines are uploaded.", 
+                answer="I couldn't find any relevant medical data in the local database.", 
                 sources=[]
             )
 

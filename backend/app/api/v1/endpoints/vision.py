@@ -25,15 +25,6 @@ async def analyze_medical_image(
     patient_id: Optional[int] = Form(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Upload and analyze medical image with background persistence
-    
-    Supported types:
-    - chest_xray
-    - skin_lesion
-    - ct_scan
-    - mri
-    """
     try:
        
         image_data = await file.read()
@@ -261,7 +252,6 @@ async def get_analysis_history(
     image_type: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Get history of image analyses"""
     
     query = db.query(ImageAnalysis)
     

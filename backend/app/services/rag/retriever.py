@@ -15,9 +15,7 @@ class VectorRetriever:
         self.top_k = top_k or settings.TOP_K_RESULTS
     
     def search(self, query: str, db: Session, top_k: Optional[int] = None) -> List[Dict]:
-        """
-        Vector similarity search. Added safety check for embedding dimensions.
-        """
+        
         limit = top_k or self.top_k
         query_embedding = embedding_service.embed_query(query)
         

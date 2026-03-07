@@ -63,32 +63,29 @@ class AudioUtils:
         4. Normalization
         """
         try:
-            # Load audio and standardize to Whisper's ideal input format
+          
             audio = AudioSegment.from_file(io.BytesIO(audio_data))
             audio = audio.set_channels(1).set_frame_rate(16000).set_sample_width(2)
             
-            # 1. Noise Reduction using noisereduce
-            # Extract samples as numpy array
+        
             samples = np.array(audio.get_array_of_samples()).astype(np.float32)
             rate = audio.frame_rate
             
-            # Apply non-stationary noise reduction (removes wind, chatter, background)
+          
             reduced_noise = nr.reduce_noise(y=samples, sr=rate, prop_decrease=0.8)
             
             # Reconstruct AudioSegment from processed samples
             audio = audio._spawn(reduced_noise.astype(np.int16).tobytes())
 
-            # 2. Frequency Filtering
-            # Remove low frequency rumble (engines, wind) below 100Hz
+          
             audio = audio.high_pass_filter(100) 
-            # Remove high frequency hiss/electrical interference above 3500Hz
+           
             audio = audio.low_pass_filter(3500) 
             
-            # 3. Dynamic Range Normalization
-            # Boosts quiet voices without clipping (perfect for large clinical rooms)
+            
             audio = audio.normalize(headroom=0.1)
             
-            # 4. Export to standardized WAV
+            #  Export to standardized WAV
             output_io = io.BytesIO()
             audio.export(output_io, format="wav", codec="pcm_s16le")
             return output_io.getvalue()
@@ -98,5 +95,4 @@ class AudioUtils:
             # Fallback: If noise reduction fails, return original data to avoid crashing the request
             return audio_data
 
-# Singleton instance for app-wide use
 audio_utils = AudioUtils()

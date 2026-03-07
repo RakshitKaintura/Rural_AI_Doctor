@@ -33,18 +33,34 @@ pillow
 opencv-python
 numpy
 
-# Voice Processing (New)
+# Voice Processing
 faster-whisper
 pydub
 soundfile
 ffmpeg-python
 gtts
 elevenlabs
+noisereduce
 
-# Utilities & Testing
-python-dotenv
-python-jose[cryptography]
-passlib[bcrypt]
-httpx
+# TESTING & QUALITY
 pytest
 pytest-asyncio
+pytest-cov
+pytest-mock
+httpx
+faker
+
+# MONITORING & LOGGING
+python-json-logger
+structlog
+sentry-sdk[fastapi]
+
+# PERFORMANCE & CACHING
+redis
+cachetools
+slowapi
+
+# SECURITY & UTILITIES
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv

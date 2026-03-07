@@ -5,18 +5,17 @@ from typing import List
 import numpy as np
 import logging
 
-# Configuration & Logging
+
 logger = logging.getLogger(__name__)
 
-# Initialize the Gemini Client
-# Explicitly removing v1beta dependency to ensure text-embedding-004 is found
+
 client = genai.Client(
     api_key=settings.GOOGLE_API_KEY
 )
 
 class EmbeddingService:
     def __init__(self):
-        # Update this line to the multilingual model
+       
         self.model_name = "models/text-multilingual-embedding-002" 
         self.dimensions = 768 # Dimensions remain the same, which is convenient
 
@@ -107,5 +106,5 @@ class EmbeddingService:
             logger.error(f"Similarity calculation error: {e}")
             return 0.0
 
-# Singleton instance for the application
+
 embedding_service = EmbeddingService()

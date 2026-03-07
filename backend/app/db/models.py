@@ -85,10 +85,6 @@ class ChatHistory(Base):
     )
 
 class ImageAnalysis(Base):
-    """
-    NEW: Jan 2026 Image Analysis Table
-    Stores AI-generated insights from clinical imagery (X-rays, etc.)
-    """
     __tablename__ = "image_analyses"
     
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -119,7 +115,7 @@ class VoiceInteraction(Base):
     transcription: Mapped[Optional[str]] = mapped_column(Text)
     language: Mapped[str] = mapped_column(String(10), default="en")
     duration_seconds: Mapped[Optional[float]]
-    confidence: Mapped[Optional[float]] # From Faster-Whisper probability
+    confidence: Mapped[Optional[float]]
     
     patient_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("patients.id", ondelete="SET NULL"), 

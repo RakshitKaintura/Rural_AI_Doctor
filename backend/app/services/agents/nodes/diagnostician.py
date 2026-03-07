@@ -17,10 +17,6 @@ class DiagnosisAssessment(BaseModel):
     reasoning: str = Field(description="Detailed clinical justification")
 
 async def diagnostician_node(state: AgentState) -> AgentState:
-    """
-    Diagnostician: Orchestrates RAG and multimodal evidence to generate a final diagnosis.
-    Includes defensive programming to prevent crashes if previous nodes fail.
-    """
     raw_text = state.get('transcription') or state.get('symptoms') or "No symptoms provided"
 
     analysis = state.get('symptom_analysis') or {}

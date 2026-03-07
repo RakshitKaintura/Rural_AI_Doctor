@@ -5,12 +5,11 @@ from app.core.config import settings
 
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=3600, 
-    echo=settings.DEBUG,
-
-    pool_size=10,
-    max_overflow=20
+    pool_pre_ping=True,      
+    pool_recycle=3600,     
+    echo=settings.DEBUG,     
+    pool_size=10,            
+    max_overflow=20          
 )
 
 SessionLocal = sessionmaker(
@@ -21,10 +20,7 @@ SessionLocal = sessionmaker(
 )
 
 def get_db():
-    """
-    FastAPI dependency that provides a database session.
-    Ensures the connection is closed even if an error occurs.
-    """
+
     db = SessionLocal()
     try:
         yield db

@@ -25,9 +25,7 @@ async def chat(
     request: ChatRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Medical chat endpoint with conversation history
-    """
+   
     try:
        
         session_id = request.session_id or str(uuid.uuid4())
@@ -108,9 +106,7 @@ async def get_chat_history(
     session_id: str,
     db: Session = Depends(get_db)
 ):
-    """
-    Retrieve chat history for a session
-    """
+    
     history = db.query(ChatHistory).filter(
         ChatHistory.session_id == session_id
     ).order_by(ChatHistory.created_at).all()
