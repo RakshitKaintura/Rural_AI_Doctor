@@ -1,96 +1,114 @@
 """
-Optimized Health Check and System Monitoring for Rural AI Doctor.
-Ensures high availability through dependency validation and resource tracking.
+Health check and monitoring endpoints.
+Integrated with Prometheus metrics and asynchronous database probes.
 """
-from fastapi import APIRouter, Depends, status, Response
-from sqlalchemy.ext.asyncio import AsyncSession # Updated for Async compatibility
-from sqlalchemy import text
+
 import psutil
-import time
-from datetime import datetime, timezone
+import logging
+from datetime import datetime
+from typing import Dict
+
+from fastapi import APIRouter, Depends, Response
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
 from app.db.session import get_db
 from app.core.config import settings
-import logging
+from app.core.metrics import metrics
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-@router.get("/health", status_code=status.HTTP_200_OK, tags=["Monitoring"])
+@router.get("/health", tags=["System"])
 async def health_check():
+    """Basic service health check."""
     return {
         "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "service": "Rural AI Doctor API",
-        "version": getattr(settings, "VERSION", "0.1.0")
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION
     }
 
-@router.get("/health/detailed", tags=["Monitoring"])
+@router.get("/health/detailed", tags=["System"])
 async def detailed_health_check(db: AsyncSession = Depends(get_db)):
-    """Comprehensive vitals: Checks Database, AI SDK, and Cache state."""
+    """Comprehensive health check including database and AI service connectivity."""
     health_status = {
         "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": settings.ENVIRONMENT,
         "checks": {}
     }
     
+    # Database connectivity check
     try:
         await db.execute(text("SELECT 1"))
-        health_status["checks"]["database"] = {"status": "up", "type": "PostgreSQL/pgvector"}
+        health_status["checks"]["database"] = {
+            "status": "healthy",
+            "type": "PostgreSQL with pgvector"
+        }
     except Exception as e:
+        logger.error(f"Health Check Failure - Database: {str(e)}")
         health_status["status"] = "unhealthy"
-        health_status["checks"]["database"] = {"status": "down", "error": str(e)}
-
-    #  Redis/Cache Configuration Check
-    health_status["checks"]["cache"] = {
-        "status": "configured" if getattr(settings, "REDIS_URL", None) else "local_memory",
-    }
-
-    #  Clinical AI Engine Check
+        health_status["checks"]["database"] = {
+            "status": "unhealthy",
+            "error": "Database unreachable"
+        }
+    
+    # AI Service configuration check
     health_status["checks"]["gemini_api"] = {
-        "status": "ready" if settings.GOOGLE_API_KEY else "missing_key",
-        "chat_model": settings.GEMINI_MODEL,
-        "embedding_supported": True
+        "status": "configured" if settings.GOOGLE_API_KEY else "not_configured",
+        "model": settings.GEMINI_MODEL
     }
     
-    if health_status["status"] == "unhealthy":
-        logger.critical(f"HEALTH FAILURE: {health_status['checks']}")
-        
     return health_status
 
 @router.get("/metrics", tags=["Monitoring"])
-async def get_metrics():
-    """Real-time system telemetry for Prometheus/Grafana style tracking."""
-    cpu_percent = psutil.cpu_percent(interval=None) # Non-blocking call
+async def get_prometheus_metrics():
+    """
+    Exposes application metrics in Prometheus format.
+    Includes system resource utilization and clinical feature usage.
+    """
+    # Capture system resource snapshots
+    cpu_usage = psutil.cpu_percent(interval=None)
     memory = psutil.virtual_memory()
-    process = psutil.Process()
     
+    # Note: Custom clinical metrics are automatically included 
+    # when generate_latest() is called if they are registered globally.
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
+
+@router.get("/stats", tags=["Monitoring"])
+async def get_system_stats():
+    """Provides a JSON snapshot of system resources for dashboarding."""
+    memory = psutil.virtual_memory()
     return {
+        "timestamp": datetime.utcnow().isoformat(),
         "system": {
-            "cpu_utilization": f"{cpu_percent}%",
-            "memory_usage": f"{memory.percent}%",
-            "disk_utilization": f"{psutil.disk_usage('/').percent}%"
+            "cpu_percent": psutil.cpu_percent(interval=None),
+            "memory": {
+                "total_gb": round(memory.total / (1024**3), 2),
+                "used_gb": round(memory.used / (1024**3), 2),
+                "percent": memory.percent
+            }
         },
-        "process": {
-            "memory_mb": round(process.memory_info().rss / (1024 * 1024), 2),
-            "uptime_sec": round(time.time() - process.create_time(), 2),
-            "thread_count": process.num_threads()
-        }
+        "version": settings.VERSION
     }
 
-@router.get("/ready", tags=["Monitoring"])
-async def readiness_check(response: Response, db: AsyncSession = Depends(get_db)):
-    
+@router.get("/ready", tags=["System"])
+async def readiness_check(db: AsyncSession = Depends(get_db)):
+    """Readiness probe for orchestration (Railway/K8s)."""
     try:
         await db.execute(text("SELECT 1"))
         if not settings.GOOGLE_API_KEY:
-            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-            return {"status": "not_ready", "reason": "AI engine offline"}
+            return Response(status_code=503, content="AI Service Not Configured")
         return {"status": "ready"}
-    except Exception:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "not_ready", "reason": "Database unavailable"}
+    except Exception as e:
+        return Response(status_code=503, content=f"Service Not Ready: {str(e)}")
 
-@router.get("/live", tags=["Monitoring"])
+@router.get("/live", tags=["System"])
 async def liveness_check():
-
-    return {"status": "alive"}
+    """Liveness probe for orchestration."""
+    return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}

@@ -1,39 +1,45 @@
-# Web & Framework
+# ==============================================================================
+# RURAL AI DOCTOR - CONSOLIDATED DEPENDENCIES (2026 PRODUCTION)
+# ==============================================================================
+
+# --- Web Framework & API ---
 fastapi
 uvicorn[standard]
 python-multipart
 pydantic
 pydantic-settings
+gunicorn
 
-# Database & Vector Search
+# --- Database & Vector Search ---
+# sqlalchemy 2.0+ with asyncpg for high-concurrency performance
 sqlalchemy
+asyncpg
 psycopg[binary]
 pgvector
 alembic
 
-# LangChain Ecosystem
+# --- AI & Agentic Orchestration ---
 langchain
 langchain-google-genai
 langgraph
 langsmith
 langchain-community
+google-generativeai
 
-# Google GenAI SDK
-google-genai
-
-# Document Processing
+# --- Document Processing (RAG) ---
 pypdf
 python-docx
 unstructured
 tiktoken
 sentence-transformers
 
-# Image Processing
+# --- Medical Imaging & Computer Vision ---
 pillow
-opencv-python
+opencv-python-headless
 numpy
 
-# Voice Processing
+# --- Voice & Audio Engineering ---
+# Faster-whisper for local performance and elevenlabs for high-quality TTS
 faster-whisper
 pydub
 soundfile
@@ -42,25 +48,26 @@ gtts
 elevenlabs
 noisereduce
 
-# TESTING & QUALITY
-pytest
-pytest-asyncio
-pytest-cov
-pytest-mock
-httpx
-faker
-
-# MONITORING & LOGGING
-python-json-logger
-structlog
-sentry-sdk[fastapi]
-
-# PERFORMANCE & CACHING
+# --- Performance, Caching & Rate Limiting ---
 redis
 cachetools
 slowapi
 
-# SECURITY & UTILITIES
+# --- Security & Authentication ---
 python-jose[cryptography]
 passlib[bcrypt]
 python-dotenv
+httpx
+
+# --- Monitoring, Logging & Observability ---
+python-json-logger
+structlog
+sentry-sdk[fastapi]
+prometheus-fastapi-instrumentator
+
+# --- Testing & Quality Assurance ---
+pytest
+pytest-asyncio
+pytest-cov
+pytest-mock
+faker

@@ -1,0 +1,75 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    name: Pytest & Coverage
+    runs-on: ubuntu-latest
+    
+    services:
+      # Using pgvector image to support medical RAG vector operations during testing
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+      
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsm6 libxext6  # Required for audio/vision processing
+      
+      - name: Install Python Dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run Pytest with Coverage
+        working-directory: ./backend
+        env:
+          # Database URL matches the service container above
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/test_db
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          SECRET_KEY: ${{ secrets.TEST_SECRET_KEY || 'ci-test-only-secret-key-32-chars-min' }}
+          ENVIRONMENT: testing
+          DEBUG: "false"
+        run: |
+          pytest --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing
+      
+      - name: Upload Coverage Results
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./backend/coverage.xml
+          flags: backend
+          name: rural-ai-doctor-backend
+          fail_ci_if_error: false

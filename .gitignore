@@ -1,33 +1,73 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
 .env
-*.json
-# Node
-node_modules/
-.next/
-out/
-.env.local
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+frontend/.env.production.local
+frontend/.env.development.local
 
-# Database
+# --- Python (Backend) ---
+backend/venv/
+backend/env/
+backend/__pycache__/
+backend/**/*.py[cod]
+backend/*$py.class
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.mypy_cache/
+backend/htmlcov/
+backend/.coverage
+backend/.coverage.*
+backend/logs/
+backend/instance/
+
+# --- Node.js / Next.js (Frontend) ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.turbo/
+frontend/.vercel
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+
+# --- Databases & Vector Stores ---
+# Ignore local SQLite and persistent vector index files
 *.db
 *.sqlite
+*.sqlite3
+backend/data/vector_store/
+backend/data/index/
 
-# IDE
-.vscode/
-.idea/
-*.swp
+# --- User Uploads & Temporary Assets ---
+# Prevent local test uploads from entering the repo
+backend/data/uploads/**/*
+!backend/data/uploads/.gitkeep
+backend/temp/
+frontend/public/uploads/
 
-# OS
+# --- Operating System & IDEs ---
 .DS_Store
 Thumbs.db
+desktop.ini
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
 
-# Data
-data/raw/
-data/processed/
-EOF
+# --- Testing & Coverage ---
+coverage/
+.nyc_output/
+backend/tests/assets/temp_*
+
+# --- Logs ---
+*.log
+logs/
+npm-debug.log*

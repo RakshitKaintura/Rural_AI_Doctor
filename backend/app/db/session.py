@@ -1,28 +1,35 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import NullPool
 from app.core.config import settings
 
-
-engine = create_engine(
+# 1. Create the Async Engine
+# Using NullPool is critical when connecting to an external pooler like Supavisor
+engine = create_async_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,      
-    pool_recycle=3600,     
-    echo=settings.DEBUG,     
-    pool_size=10,            
-    max_overflow=20          
+    echo=settings.DEBUG,
+    poolclass=NullPool,  # Let Supabase handle the pooling logic
+    connect_args={
+        # Disable caching for compatibility with Supabase Transaction Mode
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0
+    }
 )
 
-SessionLocal = sessionmaker(
-    autocommit=False, 
-    autoflush=False, 
+# 2. Setup the Async Session Factory
+# expire_on_commit=False prevents issues when accessing objects after a commit
+AsyncSessionLocal = async_sessionmaker(
     bind=engine,
-    expire_on_commit=False
+    class_=AsyncSession,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
 )
 
-def get_db():
-
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# 3. Asynchronous Dependency for FastAPI
+async def get_db():
+    """Dependency for providing a database session to FastAPI routes."""
+    async with AsyncSessionLocal() as db:
+        try:
+            yield db
+        finally:
+            await db.close()
