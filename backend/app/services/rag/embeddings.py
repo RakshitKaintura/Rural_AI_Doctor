@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize the Gemini Client using the centralized configuration
 client = genai.Client(
-    api_key=settings.GEMINI_API_KEY
+    api_key=settings.GOOGLE_API_KEY
 )
 
 class EmbeddingService:

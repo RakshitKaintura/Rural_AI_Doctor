@@ -17,8 +17,8 @@ class WhisperService:
         Cloud-based transcription service using Gemini 1.5 Flash.
         Saves ~600MB RAM compared to local Whisper models.
         """
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        genai.configure(api_key=settings.GOOGLE_API_KEY)
+        self.model = genai.GenerativeModel('gemini-3.0-flash')
         logger.info("🎙️ Cloud Voice Service (Gemini) initialized")
 
     async def transcribe_audio(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
