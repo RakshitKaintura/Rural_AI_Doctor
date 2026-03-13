@@ -7,15 +7,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # --- Basic App Info ---
+    ENVIRONMENT: str = "production"
     PROJECT_NAME: str = "Rural AI Doctor"
     VERSION: str = "1.1.0"
     API_V1_STR: str = "/api/v1"
-    DEBUG: bool = False  # Default to False for safety
+    DEBUG: bool = False  
     
     # --- Infrastructure ---
-    # Kept your verified local default for development fallback
+
     DATABASE_URL: str = "postgresql+psycopg://postgres:postgres@127.0.0.1:5434/rural_ai_doctor"
-    REDIS_URL: str = "memory://"  # Defaults to memory if Redis isn't deployed
+    REDIS_URL: str = "memory://" 
     
     # --- Google AI & Vertex AI ---
     # Updated to the current production standard while keeping your location
@@ -23,7 +24,7 @@ class Settings(BaseSettings):
     GOOGLE_CLOUD_PROJECT: str = "" 
     VERTEX_AI_LOCATION: str = "us-central1"
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
-    GEMINI_MODEL: str = 'gemini-2.0-flash' # Standard 2026 stable release
+    GEMINI_MODEL: str = 'gemini-3.0-flash' # Standard 2026 stable release
     
     # --- RAG Settings ---
     EMBEDDING_MODEL: str = "models/text-multilingual-embedding-002"
