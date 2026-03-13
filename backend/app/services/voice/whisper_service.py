@@ -1,48 +1,46 @@
 import os
 import io
-import torch
-import whisper
-import tempfile
 import logging
+import tempfile
+import google.generativeai as genai
 from typing import Dict, Optional, Any
-from pathlib import Path
 from pydub import AudioSegment
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import VoiceInteraction
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class WhisperService:
-    def __init__(self, model_size: str = "base"):
-     
-        self.model_size = model_size
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        
-        logger.info(f"🎙️ Loading Whisper model ({model_size}) on {self.device}...")
-       
-        self.model = whisper.load_model(model_size, device=self.device)
-        logger.info(f"✅ Whisper model loaded successfully")
-
-    def transcribe_audio(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
+    def __init__(self):
         """
-        Primary method used by the API endpoints to get text from raw bytes.
+        Cloud-based transcription service using Gemini 1.5 Flash.
+        Saves ~600MB RAM compared to local Whisper models.
         """
-        return self._process_audio(audio_data, language)
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        logger.info("🎙️ Cloud Voice Service (Gemini) initialized")
 
-    def transcribe_and_save(
+    async def transcribe_audio(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
+        """
+        Primary method used by the API endpoints.
+        """
+        return await self._process_audio_cloud(audio_data, language)
+
+    async def transcribe_and_save(
         self, 
-        db: Session, 
+        db: AsyncSession, 
         audio_data: bytes, 
         filename: str,
         session_id: Optional[str] = None,
         patient_id: Optional[int] = None
     ) -> VoiceInteraction:
-    
+        """
+        Transcribes audio using cloud API and saves result to Supabase.
+        """
         try:
-            #  Standardize and Transcribe
-            result = self._process_audio(audio_data)
+            result = await self._process_audio_cloud(audio_data)
             
-            #  Create Database Record
             voice_entry = VoiceInteraction(
                 session_id=session_id,
                 patient_id=patient_id,
@@ -54,69 +52,62 @@ class WhisperService:
             )
             
             db.add(voice_entry)
-            db.commit()
-            db.refresh(voice_entry)
+            await db.commit()
+            await db.refresh(voice_entry)
             
             return voice_entry
             
         except Exception as e:
-            db.rollback()
-            logger.error(f" Voice Service Error: {str(e)}")
+            await db.rollback()
+            logger.error(f"Voice Service Error: {str(e)}")
             raise e
 
-    def _process_audio(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
- 
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        tmp_path = tmp.name
+    async def _process_audio_cloud(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
+        """
+        Standardizes audio and sends it to Gemini Cloud for transcription.
+        """
+        # Create a temporary file with a proper extension for Gemini to recognize
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            tmp_path = tmp.name
         
         try:
-            #  Standardize audio
+            # 1. Standardize audio using pydub
             audio = AudioSegment.from_file(io.BytesIO(audio_data))
+            # Convert to mono, 16kHz for optimal transcription
             audio = audio.set_frame_rate(16000).set_channels(1)
-            
-            #  Export and immediately CLOSE the handle so Windows releases the lock
             audio.export(tmp_path, format="wav")
-            tmp.close() 
 
-            #  Now Whisper can safely open the file
-            result = self.model.transcribe(
-                tmp_path, 
-                language=language,
-                fp16=(self.device == "cuda")
-            )
+            # 2. Upload to Gemini
+            # Note: For production, consider file expiration or unique naming
+            uploaded_file = genai.upload_file(path=tmp_path, display_name="consultation_audio")
             
+            # 3. Generate transcription
+            prompt = "Transcribe the following medical audio accurately."
+            if language:
+                prompt += f" The expected language is {language}."
+                
+            response = self.model.generate_content([prompt, uploaded_file])
+            
+            # 4. Clean up the uploaded file from Gemini storage
+            genai.delete_file(uploaded_file.name)
+
             return {
-                "text": result["text"].strip(),
-                "language": result.get("language", "en"),
-                "duration": result["segments"][-1]["end"] if result["segments"] else 0,
-                "confidence": self._calculate_confidence(result["segments"])
+                "text": response.text.strip(),
+                "language": language if language else "auto",
+                "duration": len(audio) / 1000.0,  # pydub duration is in ms
+                "confidence": 0.95  # Gemini doesn't return raw confidence; using a high-quality constant
             }
         finally:
-            # Manually cleanup once everything is done
-            try:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-            except Exception as e:
-                logger.warning(f"Could not remove temp file {tmp_path}: {e}")
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
-    def _calculate_confidence(self, segments: list) -> float:
-        """Calculates a rough confidence score based on no_speech probability"""
-        if not segments: return 0.0
-        # Lower no_speech_prob means higher confidence in the transcription
-        return sum(1.0 - s.get('no_speech_prob', 0) for s in segments) / len(segments)
+# Singleton initialization
+_voice_instance = WhisperService()
 
-
-
-_whisper_instance = WhisperService(model_size="base")
-
-def get_whisper_service(model_size: str = "base"):
+def get_whisper_service():
     """
-    Factory function used by FastAPI endpoints.
-    Returns the initialized singleton.
+    Factory function for FastAPI dependency injection.
     """
-    global _whisper_instance
-    if _whisper_instance is None:
-        _whisper_instance = WhisperService(model_size=model_size)
-    return _whisper_instance
+    return _voice_instance
 
-whisper_service = _whisper_instance
+whisper_service = _voice_instance

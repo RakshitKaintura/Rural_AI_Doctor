@@ -1,5 +1,5 @@
 # ==============================================================================
-# RURAL AI DOCTOR - CONSOLIDATED DEPENDENCIES (2026 PRODUCTION)
+# RURAL AI DOCTOR - LEAN PRODUCTION (RENDER FREE TIER COMPATIBLE)
 # ==============================================================================
 
 # --- Web Framework & API ---
@@ -11,7 +11,6 @@ pydantic-settings
 gunicorn
 
 # --- Database & Vector Search ---
-# Ensure Psycopg 3 is explicitly available for the postgresql+psycopg:// dialect
 sqlalchemy>=2.0.0
 asyncpg
 psycopg[binary]
@@ -31,7 +30,8 @@ pypdf
 python-docx
 unstructured
 tiktoken
-sentence-transformers
+pymupdf4llm
+pymupdf
 
 # --- Medical Imaging & Computer Vision ---
 pillow
@@ -39,7 +39,7 @@ opencv-python-headless
 numpy
 
 # --- Voice & Audio Engineering ---
-faster-whisper
+# Removed faster-whisper (Heavy). Using Gemini/ElevenLabs for cloud audio.
 pydub
 soundfile
 ffmpeg-python
@@ -70,6 +70,3 @@ pytest-asyncio
 pytest-cov
 pytest-mock
 faker
-
-pymupdf4llm
-pymupdf
