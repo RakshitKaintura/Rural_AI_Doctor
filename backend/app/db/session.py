@@ -33,3 +33,6 @@ async def get_db():
             yield db
         finally:
             await db.close()
+
+# Alias for compatibility with other parts of the app
+SessionLocal = AsyncSessionLocal
