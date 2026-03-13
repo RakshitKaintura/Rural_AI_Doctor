@@ -70,3 +70,6 @@ pytest-asyncio
 pytest-cov
 pytest-mock
 faker
+
+pymupdf4llm
+pymupdf
