@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
     
     # 1. Run Production Readiness Checks (Storage, Env Vars, Connectivity)
     try:
-        run_production_checks()
+        await run_production_checks()
     except Exception as e:
         logger.error(f"System readiness checks failed: {e}")
         if settings.ENVIRONMENT == "production":

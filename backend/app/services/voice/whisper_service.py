@@ -2,7 +2,7 @@ import os
 import io
 import logging
 import tempfile
-import google.generativeai as genai
+from google as genai
 from typing import Dict, Optional, Any
 from pydub import AudioSegment
 from sqlalchemy.ext.asyncio import AsyncSession

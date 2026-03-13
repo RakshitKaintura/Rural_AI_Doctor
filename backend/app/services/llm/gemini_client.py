@@ -13,7 +13,7 @@ class GeminiClient:
             os.environ["GOOGLE_API_KEY"] = settings.GOOGLE_API_KEY
         
         self.llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash", 
+        model="gemini-3.0-flash", 
         google_api_key=settings.GOOGLE_API_KEY,
         temperature=0.1,
     )
