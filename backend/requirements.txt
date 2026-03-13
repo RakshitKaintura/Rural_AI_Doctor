@@ -11,8 +11,8 @@ pydantic-settings
 gunicorn
 
 # --- Database & Vector Search ---
-# sqlalchemy 2.0+ with asyncpg for high-concurrency performance
-sqlalchemy
+# Ensure Psycopg 3 is explicitly available for the postgresql+psycopg:// dialect
+sqlalchemy>=2.0.0
 asyncpg
 psycopg[binary]
 pgvector
@@ -39,7 +39,6 @@ opencv-python-headless
 numpy
 
 # --- Voice & Audio Engineering ---
-# Faster-whisper for local performance and elevenlabs for high-quality TTS
 faster-whisper
 pydub
 soundfile
