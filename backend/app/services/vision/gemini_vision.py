@@ -14,7 +14,7 @@ client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
 class GeminiVisionService:
     def __init__(self):
-        self.model_name ="gemini-2.5-flash"
+        self.model_name ="gemini-3.1-flash-lite-preview"
     
     async def analyze_medical_image(
     self,

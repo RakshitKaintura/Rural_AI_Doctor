@@ -24,10 +24,10 @@ class Settings(BaseSettings):
     GOOGLE_CLOUD_PROJECT: str = "" 
     VERTEX_AI_LOCATION: str = "us-central1"
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
-    GEMINI_MODEL: str = 'gemini-3.0-flash' # Standard 2026 stable release
+    GEMINI_MODEL: str = 'gemini-3.1-flash-lite-preview' 
     
-    # --- RAG Settings ---
-    EMBEDDING_MODEL: str = "models/text-multilingual-embedding-002"
+    # UPDATED: Use the new multimodal embedding model
+    EMBEDDING_MODEL: str = "models/gemini-embedding-2-preview"
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     TOP_K_RESULTS: int = 3

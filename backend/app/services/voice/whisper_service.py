@@ -17,9 +17,10 @@ class WhisperService:
         Cloud-based transcription service using Gemini 1.5 Flash.
         Saves ~600MB RAM compared to local Whisper models.
         """
-        genai.configure(api_key=settings.GOOGLE_API_KEY)
-        self.model = genai.GenerativeModel('gemini-3.0-flash')
-        logger.info("🎙️ Cloud Voice Service (Gemini) initialized")
+        # CORRECT V2 SYNTAX: Initialize the Client
+        self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        self.model_id = 'gemini-3.1-flash-lite-preview'  # Stable multimodal production standard
+        logger.info("🎙️ Cloud Voice Service (Gemini V2 SDK) initialized")
 
     async def transcribe_audio(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
         """
@@ -66,7 +67,7 @@ class WhisperService:
         """
         Standardizes audio and sends it to Gemini Cloud for transcription.
         """
-        # Create a temporary file with a proper extension for Gemini to recognize
+        # Create a temporary file with a proper extension
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             tmp_path = tmp.name
         
@@ -77,25 +78,27 @@ class WhisperService:
             audio = audio.set_frame_rate(16000).set_channels(1)
             audio.export(tmp_path, format="wav")
 
-            # 2. Upload to Gemini
-            # Note: For production, consider file expiration or unique naming
-            uploaded_file = genai.upload_file(path=tmp_path, display_name="consultation_audio")
+            # 2. CORRECT V2 SYNTAX: Upload to Gemini via client
+            uploaded_file = self.client.files.upload(path=tmp_path)
             
-            # 3. Generate transcription
+            # 3. CORRECT V2 SYNTAX: Generate transcription
             prompt = "Transcribe the following medical audio accurately."
             if language:
                 prompt += f" The expected language is {language}."
                 
-            response = self.model.generate_content([prompt, uploaded_file])
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=[prompt, uploaded_file]
+            )
             
-            # 4. Clean up the uploaded file from Gemini storage
-            genai.delete_file(uploaded_file.name)
+            # 4. CORRECT V2 SYNTAX: Clean up file
+            self.client.files.delete(name=uploaded_file.name)
 
             return {
                 "text": response.text.strip(),
                 "language": language if language else "auto",
-                "duration": len(audio) / 1000.0,  # pydub duration is in ms
-                "confidence": 0.95  # Gemini doesn't return raw confidence; using a high-quality constant
+                "duration": len(audio) / 1000.0,
+                "confidence": 0.95
             }
         finally:
             if os.path.exists(tmp_path):
