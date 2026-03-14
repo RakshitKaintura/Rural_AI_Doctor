@@ -40,6 +40,10 @@ from app.middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 setup_logging("DEBUG" if settings.DEBUG else "INFO")
 logger = logging.getLogger(__name__)
 
+async def init_models():
+    async with engine.begin() as conn:
+        # This creates tables if they don't exist
+        await conn.run_sync(Base.metadata.create_all)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -54,6 +58,7 @@ async def lifespan(app: FastAPI):
     # 1. Run Production Readiness Checks (Storage, Env Vars, Connectivity)
     try:
         await run_production_checks()
+        await init_models()
     except Exception as e:
         logger.error(f"System readiness checks failed: {e}")
         if settings.ENVIRONMENT == "production":
