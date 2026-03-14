@@ -3,6 +3,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.core.config import settings
 from typing import List, Dict, Type, TypeVar
 import os
+from google import genai
 
 T = TypeVar("T")
 
