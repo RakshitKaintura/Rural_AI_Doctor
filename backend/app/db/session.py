@@ -8,11 +8,7 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     poolclass=NullPool,  # Let Supabase handle the pooling logic
-    connect_args={
-        # Disable caching for compatibility with Supabase Transaction Mode
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0
-    }
+    connect_args={}
 )
 
 # 2. Setup the Async Session Factory
