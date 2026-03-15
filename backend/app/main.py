@@ -41,14 +41,26 @@ setup_logging("DEBUG" if settings.DEBUG else "INFO")
 logger = logging.getLogger(__name__)
 
 async def init_models():
-    async with engine.begin() as conn:
-        # This creates tables if they don't exist
-        await conn.run_sync(Base.metadata.create_all)
+    """
+    Asynchronously synchronize the database schema.
+    Uses 'run_sync' to allow the AsyncEngine to execute synchronous DDL commands.
+    """
+    try:
+        async with engine.begin() as conn:
+            # run_sync is required to use metadata.create_all with an AsyncEngine
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("✅ Database schema synchronized")
+    except Exception as e:
+        logger.error(f"❌ Failed to sync database schema: {e}")
+        # In production, we don't want to crash solely on sync failure if tables already exist
+        if settings.ENVIRONMENT == "production":
+            logger.warning("Continuing startup: Tables may already exist via migrations.")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Manages the application lifecycle.
-    Replaces deprecated @app.on_event handlers with modern lifespan logic.
+    Handles startup sequence: Readiness checks -> DB Sync -> App Start.
     """
     logger.info(
         f"🚀 Starting {settings.PROJECT_NAME} v{settings.VERSION}",
@@ -58,19 +70,13 @@ async def lifespan(app: FastAPI):
     # 1. Run Production Readiness Checks (Storage, Env Vars, Connectivity)
     try:
         await run_production_checks()
+        # 2. Sync Database Schema (Async Safe)
         await init_models()
     except Exception as e:
         logger.error(f"System readiness checks failed: {e}")
         if settings.ENVIRONMENT == "production":
-            raise  # Prevent startup in broken production environments
-
-    # 2. Sync Database Schema
-    # Note: For production, using Alembic migrations is recommended over create_all
-    try:
-        Base.metadata.create_all(bind=engine)
-        logger.info("✅ Database schema synchronized")
-    except Exception as e:
-        logger.error(f"Failed to sync database: {e}")
+            # CRITICAL: Prevent startup in broken production environments
+            raise 
 
     yield
     
@@ -94,6 +100,7 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     lifespan=lifespan,
+    # Documentation is disabled in production for security
     openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DEBUG else None,
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None
@@ -110,6 +117,7 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS Configuration
+# Combines localhost defaults with production origins from settings
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -195,4 +203,6 @@ async def trigger_error():
     return {"message": "This will not be reached"}
 
 if __name__ == "__main__":
+    # In production, uvicorn is typically called via the Render start command:
+    # uvicorn app.main:app --host 0.0.0.0 --port $PORT
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=settings.DEBUG)
