@@ -53,7 +53,8 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             // Refined policy to allow API calls and Google AI Studio assets
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || '') + ";"
+            // We use the base domain in connect-src to allow all subpaths naturally
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://rural-ai-doctor.onrender.com;"
           }
         ],
       },
