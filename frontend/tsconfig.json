@@ -2,7 +2,11 @@
   "compilerOptions": {
     "baseUrl": ".",
     "target": "ESNext",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -14,11 +18,21 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "paths": {
-      "@/*": ["./src/*"],
-      "ai/react": ["node_modules/ai/react/dist/index.d.ts"],
-      "@ai-sdk/react": ["node_modules/@ai-sdk/react/dist/index.d.ts"]
+      "@/*": [
+        "./src/*"
+      ],
+      "ai/react": [
+        "node_modules/ai/react/dist/index.d.ts"
+      ],
+      "@ai-sdk/react": [
+        "node_modules/@ai-sdk/react/dist/index.d.ts"
+      ]
     }
   },
   "include": [
@@ -28,7 +42,10 @@
     ".next/types/**/*.ts",
     "src/**/*",
     "src/declarations.d.ts",
-    "jest.setup.js"
+    "jest.setup.js",
+    ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }
