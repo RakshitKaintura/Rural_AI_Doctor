@@ -127,7 +127,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
     expose_headers=["X-Process-Time-MS"],
     max_age=3600, 
@@ -167,6 +167,7 @@ async def log_requests(request: Request, call_next):
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Status & Diagnostic Endpoints
+@app.head("/", tags=["Status"])
 @app.get("/", tags=["Status"])
 async def root():
     return {
@@ -177,6 +178,7 @@ async def root():
         "docs": "/docs" if settings.DEBUG else "disabled"
     }
 
+@app.head("/health", tags=["Status"])
 @app.get("/health", tags=["Status"])
 async def health_check():
     """Simple health check for load balancers."""
