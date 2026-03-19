@@ -44,7 +44,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 # Increased for better UX
     
     # --- CORS Configuration ---
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    BACKEND_CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "https://rural-ai-doctor-rwp9-j5kvvx8u8-rockys-projects-e671580a.vercel.app"
+    ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
