@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -23,7 +23,7 @@ router = APIRouter()
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
    
     try:
@@ -37,11 +37,17 @@ async def chat(
         system_prompt = request.system_prompt or MEDICAL_SYSTEM_PROMPT
         response_text = await gemini_client.chat(messages, system_prompt)
         
+        if isinstance(response_text, list):
+            # Extract text if response_text is a list of dicts (LangChain behavior for some models)
+            response_text = "".join([item.get("text", "") for item in response_text if isinstance(item, dict)])
+        elif not isinstance(response_text, str):
+            response_text = str(response_text)
+            
       
         user_msg = ChatHistory(
             session_id=session_id,
             role="user",
-            content=messages[-1]["content"]
+            content=messages[-1]["content"] # type: ignore
         )
         db.add(user_msg)
         
@@ -52,7 +58,7 @@ async def chat(
             content=response_text
         )
         db.add(assistant_msg)
-        db.commit()
+        await db.commit()
         
         return ChatResponse(
             message=response_text,

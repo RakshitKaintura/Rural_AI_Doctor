@@ -61,8 +61,8 @@ async def analyze_medical_image(
             recommendations=analysis_result.get("recommendations", "Consult with a physician.")
         )
         db.add(image_analysis)
-        db.commit()
-        db.refresh(image_analysis)
+        await db.commit()
+        await db.refresh(image_analysis)
         
         return ImageAnalysisResponse(
             analysis_id=image_analysis.id,
@@ -141,7 +141,7 @@ async def analyze_chest_xray(
         )
         
         db.add(image_analysis)
-        db.commit()
+        await db.commit()
         
    
         full_text = analysis_result.get("full_analysis", "")

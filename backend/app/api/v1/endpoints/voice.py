@@ -69,8 +69,8 @@ async def transcribe_audio(
         )
         
         db.add(voice_record)
-        db.commit()
-        db.refresh(voice_record)
+        await db.commit()
+        await db.refresh(voice_record)
         
         return voice_record
         
