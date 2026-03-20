@@ -27,6 +27,7 @@ from app.api.v1 import api_router
 # Database Initialization
 from app.db.base import Base 
 from app.db.session import engine 
+from sqlalchemy import text
 
 # Middleware and Handlers
 from app.middleware.error_handler import (
@@ -46,6 +47,12 @@ async def init_models():
     Uses 'run_sync' to allow the AsyncEngine to execute synchronous DDL commands.
     """
     try:
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        except Exception as ext_e:
+            logger.warning(f"Could not create vector extension automatically: {ext_e}")
+
         async with engine.begin() as conn:
             # run_sync is required to use metadata.create_all with an AsyncEngine
             await conn.run_sync(Base.metadata.create_all)
