@@ -55,10 +55,10 @@ class VectorRetriever:
             for doc, similarity in results
         ]
 
-    def search_with_filter(
+    async def search_with_filter(
         self,
         query: str,
-        db: Session,
+        db: AsyncSession,
         filters: Optional[Dict] = None,
         top_k: Optional[int] = None
     ) -> List[Dict]:
@@ -87,7 +87,8 @@ class VectorRetriever:
         stmt = stmt.order_by(distance_expr).limit(limit)
         
         try:
-            results = db.execute(stmt).all()
+            result = await db.execute(stmt)
+            results = result.all()
         except Exception:
             return []
         
