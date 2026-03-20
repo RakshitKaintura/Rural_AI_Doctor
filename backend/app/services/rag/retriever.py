@@ -1,6 +1,6 @@
 from typing import List, Dict, Optional
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import MedicalDocument
 from app.services.rag.embeddings import embedding_service
@@ -14,7 +14,7 @@ class VectorRetriever:
     def __init__(self, top_k: int = None):
         self.top_k = top_k or settings.TOP_K_RESULTS
     
-    def search(self, query: str, db: Session, top_k: Optional[int] = None) -> List[Dict]:
+    async def search(self, query: str, db: AsyncSession, top_k: Optional[int] = None) -> List[Dict]:
         
         limit = top_k or self.top_k
         query_embedding = embedding_service.embed_query(query)
@@ -38,7 +38,8 @@ class VectorRetriever:
         )
 
         try:
-            results = db.execute(stmt).all()
+            result = await db.execute(stmt)
+            results = result.all()
         except Exception as e:
             print(f" SQL Vector Search Error: {e}")
             return []

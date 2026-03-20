@@ -9,7 +9,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from fastapi.responses import StreamingResponse, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.db.models import VoiceInteraction
@@ -40,7 +40,7 @@ async def transcribe_audio(
     file: UploadFile = File(...), # Key matches 'file' in test_transcribe_invalid_file
     language: Optional[str] = Form(None),
     session_id: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
   
     try:
@@ -102,7 +102,7 @@ async def voice_diagnosis(
     age: int = Form(...),
     gender: str = Form(...),
     medical_history: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     
     try:

@@ -107,15 +107,20 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+from sqlalchemy.future import select
+
 @router.get("/history/{session_id}")
 async def get_chat_history(
     session_id: str,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     
-    history = db.query(ChatHistory).filter(
-        ChatHistory.session_id == session_id
-    ).order_by(ChatHistory.created_at).all()
+    result = await db.execute(
+        select(ChatHistory)
+        .filter(ChatHistory.session_id == session_id)
+        .order_by(ChatHistory.created_at)
+    )
+    history = result.scalars().all()
     
     return {
         "session_id": session_id,

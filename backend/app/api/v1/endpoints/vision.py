@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from app.db.session import get_db
 from app.db.models import ImageAnalysis
 from app.schemas.vision import (
@@ -23,7 +24,7 @@ async def analyze_medical_image(
     patient_context: Optional[str] = Form(None),
     enhance_image: bool = Form(True),
     patient_id: Optional[int] = Form(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     try:
        
@@ -90,7 +91,7 @@ async def analyze_chest_xray(
     age: Optional[int] = Form(None),
     gender: Optional[str] = Form(None),
     medical_history: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Specialized endpoint for chest X-ray analysis
@@ -225,10 +226,11 @@ async def analyze_chest_xray(
 
 
 @router.get("/analysis/{analysis_id}", response_model=ImageAnalysisResponse)
-async def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
+async def get_analysis(analysis_id: int, db: AsyncSession = Depends(get_db)):
     """Retrieve previous image analysis"""
     
-    analysis = db.query(ImageAnalysis).filter(ImageAnalysis.id == analysis_id).first()
+    result = await db.execute(select(ImageAnalysis).filter(ImageAnalysis.id == analysis_id))
+    analysis = result.scalars().first()
     
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis not found")
@@ -250,15 +252,16 @@ async def get_analysis(analysis_id: int, db: Session = Depends(get_db)):
 async def get_analysis_history(
     limit: int = 10,
     image_type: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     
-    query = db.query(ImageAnalysis)
+    query = select(ImageAnalysis)
     
     if image_type:
         query = query.filter(ImageAnalysis.image_type == image_type)
     
-    analyses = query.order_by(ImageAnalysis.created_at.desc()).limit(limit).all()
+    result = await db.execute(query.order_by(ImageAnalysis.created_at.desc()).limit(limit))
+    analyses = result.scalars().all()
     
     return {
         "total": len(analyses),

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from sqlalchemy import func
 import shutil
 from pathlib import Path
@@ -23,10 +24,10 @@ from app.services.llm.gemini_client import gemini_client
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-def background_indexing(file_path: str, db_session: Session, filename: str):
+async def background_indexing(file_path: str, db_session: AsyncSession, filename: str):
     try:
         logger.info(f"Starting background indexing for: {filename}")
-        chunks = document_indexer.index_document(
+        chunks = await document_indexer.index_document(
             file_path, 
             db_session, 
             custom_metadata={"uploaded_filename": filename}
@@ -47,13 +48,16 @@ def background_indexing(file_path: str, db_session: Session, filename: str):
                     time.sleep(0.5)
 
 @router.get("/stats")
-async def get_index_stats(db: Session = Depends(get_db)):
+async def get_index_stats(db: AsyncSession = Depends(get_db)):
   
     try:
-        total_chunks = db.query(func.count(MedicalDocument.id)).scalar()
-        sources_query = db.query(
-            MedicalDocument.metadata_json['uploaded_filename'].astext
-        ).distinct().all()
+        total_chunks_result = await db.execute(select(func.count(MedicalDocument.id)))
+        total_chunks = total_chunks_result.scalar()
+        
+        sources_result = await db.execute(
+            select(MedicalDocument.metadata_json['uploaded_filename'].astext).distinct()
+        )
+        sources_query = sources_result.all()
         
         unique_sources = [row[0] for row in sources_query if row[0]]
         
@@ -70,7 +74,7 @@ async def get_index_stats(db: Session = Depends(get_db)):
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...), 
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
   
     try:
@@ -97,10 +101,10 @@ async def upload_document(
 
 @router.post("/query", response_model=RAGQueryResponse)
 @router.post("/search", response_model=RAGQueryResponse) # Alias to fix test 404s
-async def rag_query(request: RAGQueryRequest, db: Session = Depends(get_db)):
+async def rag_query(request: RAGQueryRequest, db: AsyncSession = Depends(get_db)):
 
     try:
-        retrieved_docs = vector_retriever.search(request.question, db, request.top_k)
+        retrieved_docs = await vector_retriever.search(request.question, db, request.top_k)
         
         if not retrieved_docs:
             return RAGQueryResponse(

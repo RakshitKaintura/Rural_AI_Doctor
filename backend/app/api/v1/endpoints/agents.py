@@ -1,7 +1,8 @@
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from app.db.session import get_db
 from app.db.models import ImageAnalysis
@@ -21,15 +22,16 @@ router = APIRouter()
 )
 async def multi_agent_diagnosis(
     request: DiagnosisRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
   
     try:
         image_analysis_data = None
         if request.image_analysis_id:
-            image_record = db.query(ImageAnalysis).filter(
-                ImageAnalysis.id == request.image_analysis_id
-            ).first()
+            result = await db.execute(
+                select(ImageAnalysis).filter(ImageAnalysis.id == request.image_analysis_id)
+            )
+            image_record = result.scalars().first()
             
             if not image_record:
                 logger.warning(f"Image ID {request.image_analysis_id} not found. Proceeding without vision data.")

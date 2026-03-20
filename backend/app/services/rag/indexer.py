@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import MedicalDocument
 from app.services.rag.document_loader import document_loader
 from app.services.rag.chunking import text_chunker
@@ -8,10 +8,10 @@ from pathlib import Path
 
 
 class DocumentIndexer:
-    def index_document(
+    async def index_document(
         self,
         file_path: str,
-        db: Session,
+        db: AsyncSession,
         custom_metadata: Optional[dict] = None
     ) -> int:
         """
@@ -50,21 +50,21 @@ class DocumentIndexer:
                 
            
                 if indexed_count % 50 == 0:
-                    db.commit()
+                    await db.commit()
             
             except Exception as e:
                 
-                db.rollback()
+                await db.rollback()
                 print(f"Error indexing chunk {chunk['metadata']['chunk_index']} of {file_path}: {e}")
                 continue
         
-        db.commit()
+        await db.commit()
         return indexed_count
 
-    def index_directory(
+    async def index_directory(
         self,
         directory_path: str,
-        db: Session,
+        db: AsyncSession,
         custom_metadata: Optional[dict] = None
     ) -> dict:
         """
@@ -85,7 +85,7 @@ class DocumentIndexer:
         for file_path in directory.rglob("*"):
             if file_path.is_file() and file_path.suffix.lower() in valid_extensions:
                 try:
-                    chunks_indexed = self.index_document(
+                    chunks_indexed = await self.index_document(
                         str(file_path),
                         db,
                         custom_metadata
@@ -103,16 +103,17 @@ class DocumentIndexer:
         
         return stats
 
-    def reindex_all(self, db: Session):
+    async def reindex_all(self, db: AsyncSession):
         """
         Wipe the current index and prepare for a fresh ingestion.
         """
+        from sqlalchemy import delete
         try:
-            db.query(MedicalDocument).delete()
-            db.commit()
+            await db.execute(delete(MedicalDocument))
+            await db.commit()
             print("✅ Database cleared. Ready for fresh indexing.")
         except Exception as e:
-            db.rollback()
+            await db.rollback()
             print(f"Error clearing index: {e}")
 
 document_indexer = DocumentIndexer()
