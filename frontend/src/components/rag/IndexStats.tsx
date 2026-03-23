@@ -26,7 +26,7 @@ export function IndexStats() {
     } catch (err: any) {
       console.error('Failed to load stats:', err);
       setError(err.message === "Network Error" 
-        ? "Backend Offline: Cannot connect to Port 8000" 
+        ? "Backend Offline or Unreachable. Please check the API URL." 
         : "Failed to sync knowledge base");
     } finally {
       setLoading(false);

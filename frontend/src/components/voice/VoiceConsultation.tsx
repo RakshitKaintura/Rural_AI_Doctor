@@ -82,7 +82,8 @@ export function VoiceDiagnosis() {
     formData.append('audio_file', blob, 'consultation.wav');
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/voice/diagnose', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000/api/v1';
+      const response = await fetch(`${API_BASE_URL}/voice/diagnose`, {
         method: 'POST',
         body: formData,
       });

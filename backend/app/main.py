@@ -59,9 +59,8 @@ async def init_models():
         logger.info("✅ Database schema synchronized")
     except Exception as e:
         logger.error(f"❌ Failed to sync database schema: {e}")
-        # In production, we don't want to crash solely on sync failure if tables already exist
-        if settings.ENVIRONMENT == "production":
-            logger.warning("Continuing startup: Tables may already exist via migrations.")
+        # We don't want to crash on sync failure, especially in Render where tables might exist or we just want the UI to be available
+        logger.warning("Continuing startup: Tables may already exist or DB is offline but app should run.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -81,9 +80,8 @@ async def lifespan(app: FastAPI):
         await init_models()
     except Exception as e:
         logger.error(f"System readiness checks failed: {e}")
-        if settings.ENVIRONMENT == "production":
-            # CRITICAL: Prevent startup in broken production environments
-            raise 
+        # Always continue startup so we don't get 502 Bad Gateway
+        logger.warning("Ignoring startup failures. The app will start but might malfunction.")
 
     yield
     

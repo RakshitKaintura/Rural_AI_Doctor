@@ -49,6 +49,17 @@ class Settings(BaseSettings):
         "https://rural-ai-doctor-rwp9-j5kvvx8u8-rockys-projects-e671580a.vercel.app"
     ]
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_db_url(cls, v: str) -> str:
+        """Fix async driver definition for Render and similar PaaS"""
+        if isinstance(v, str):
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql+psycopg://", 1)
+            elif v.startswith("postgresql://"):
+                v = v.replace("postgresql://", "postgresql+psycopg://", 1)
+        return v
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> Union[List[str], str]:

@@ -35,7 +35,8 @@ export function XRayUpload() {
     if (!result?.analysis_id) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/vision/analysis/${result.analysis_id}/pdf`);
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000/api/v1';
+      const response = await fetch(`${API_BASE_URL}/vision/analysis/${result.analysis_id}/pdf`);
       
       if (!response.ok) throw new Error('Failed to generate PDF');
 
