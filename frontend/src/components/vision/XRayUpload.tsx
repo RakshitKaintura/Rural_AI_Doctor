@@ -16,6 +16,7 @@ import {
   X
 } from 'lucide-react';
 import { visionAPI, XRayAnalysisResponse } from '@/lib/api/vision';
+import { getApiBaseUrl } from '@/lib/api/base-url';
 import Image from 'next/image';
 
 export function XRayUpload() {
@@ -35,7 +36,7 @@ export function XRayUpload() {
     if (!result?.analysis_id) return;
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000/api/v1';
+      const API_BASE_URL = getApiBaseUrl();
       const response = await fetch(`${API_BASE_URL}/vision/analysis/${result.analysis_id}/pdf`);
       
       if (!response.ok) throw new Error('Failed to generate PDF');

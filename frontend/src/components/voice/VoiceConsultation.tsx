@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RecordPlugin from 'wavesurfer.js/dist/plugins/record.esm.js';
 import { Mic, Square, Loader2 } from 'lucide-react';
+import { getApiBaseUrl } from '@/lib/api/base-url';
 
 // Define the response shape based on your voice schema
 interface VoiceDiagnosisResponse {
@@ -82,7 +83,7 @@ export function VoiceDiagnosis() {
     formData.append('audio_file', blob, 'consultation.wav');
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:8000/api/v1';
+      const API_BASE_URL = getApiBaseUrl();
       const response = await fetch(`${API_BASE_URL}/voice/diagnose`, {
         method: 'POST',
         body: formData,

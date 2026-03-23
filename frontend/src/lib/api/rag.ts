@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getApiBaseUrl } from './base-url';
 
 
 export interface IndexStats {
@@ -24,7 +25,7 @@ export interface RAGQueryResponse {
 }
 
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://127.0.0.1:8000/api/v1';
+const BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: BASE_URL,
