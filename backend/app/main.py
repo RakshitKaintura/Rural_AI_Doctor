@@ -5,6 +5,7 @@ Integrated with Structured Logging, Sentry, LangSmith, and Global Error Handling
 
 import time
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -73,19 +74,28 @@ async def lifespan(app: FastAPI):
         extra={"environment": settings.ENVIRONMENT, "debug": settings.DEBUG}
     )
     
-    # 1. Run Production Readiness Checks (Storage, Env Vars, Connectivity)
-    try:
-        await run_production_checks()
-        # 2. Sync Database Schema (Async Safe)
-        await init_models()
-    except Exception as e:
-        logger.error(f"System readiness checks failed: {e}")
-        # Always continue startup so we don't get 502 Bad Gateway
-        logger.warning("Ignoring startup failures. The app will start but might malfunction.")
+    async def _startup_warmup() -> None:
+        """Run heavy startup tasks in background so Render can mark the service healthy quickly."""
+        try:
+            await asyncio.wait_for(run_production_checks(), timeout=20)
+            await asyncio.wait_for(init_models(), timeout=20)
+        except asyncio.TimeoutError:
+            logger.warning("Startup warmup timed out. Continuing with a live API; background deps may still be initializing.")
+        except Exception as e:
+            logger.error(f"System readiness checks failed: {e}")
+            logger.warning("Ignoring startup failures. The app will start but might malfunction.")
+
+    warmup_task = asyncio.create_task(_startup_warmup())
 
     yield
     
     # Shutdown logic
+    if not warmup_task.done():
+        warmup_task.cancel()
+        try:
+            await warmup_task
+        except asyncio.CancelledError:
+            logger.info("Startup warmup task cancelled during shutdown")
     logger.info(f"Cleanup: Shutting down {settings.PROJECT_NAME}")
 
 # Sentry Initialization 
