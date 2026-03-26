@@ -1,5 +1,6 @@
 import os
 import json
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 from typing import List, Union, Any
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -62,6 +63,12 @@ class Settings(BaseSettings):
                 v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
             elif v.startswith("postgresql+psycopg://"):
                 v = v.replace("postgresql+psycopg://", "postgresql+asyncpg://", 1)
+
+            # PgBouncer compatibility: disable prepared statement cache.
+            parsed = urlparse(v)
+            query_params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            query_params.setdefault("prepared_statement_cache_size", "0")
+            v = urlunparse(parsed._replace(query=urlencode(query_params)))
         return v
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

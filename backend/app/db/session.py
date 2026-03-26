@@ -8,7 +8,10 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     poolclass=NullPool,  # Let Supabase handle the pooling logic
-    connect_args={}
+    connect_args={
+        # Required when using PgBouncer in transaction/statement pool mode.
+        "statement_cache_size": 0,
+    }
 )
 
 # 2. Setup the Async Session Factory
