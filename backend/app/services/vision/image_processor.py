@@ -5,8 +5,8 @@ Optimized for February 2026 Standards
 
 from PIL import Image
 import io
-import cv2
 import numpy as np
+from PIL import ImageOps
 from typing import Tuple, Optional
 
 
@@ -104,6 +104,13 @@ class ImageProcessor:
         Apply medical image enhancement using CLAHE.
         Optimized for Numpy 2.2 and Gemini 2.5 vision encoders.
         """
+        # Lazy import keeps OpenCV from inflating memory during app startup on Render.
+        try:
+            import cv2  # type: ignore
+        except Exception:
+            # Fallback keeps endpoint functional even if OpenCV cannot be loaded.
+            return ImageOps.autocontrast(image)
+
       
         img_array = np.asarray(image)
         

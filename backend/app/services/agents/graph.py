@@ -1,12 +1,6 @@
 from typing import Literal
 from langgraph.graph import StateGraph, END, START
 from app.services.agents.state import AgentState
-from app.services.agents.nodes.triage import triage_node
-from app.services.agents.nodes.symptom_analyzer import symptom_analyzer_node
-from app.services.agents.nodes.image_analyzer import image_analyzer_node
-from app.services.agents.nodes.diagnostician import diagnostician_node
-from app.services.agents.nodes.treatment_planner import treatment_planner_node
-from app.services.agents.nodes.report_generator import report_generator_node
 
 
 def triage_router(state:AgentState)->Literal["symptom_analysis","image_analysis", "diagnosis"]:
@@ -22,6 +16,13 @@ def symptom_router(state: AgentState) -> Literal["image_analysis", "diagnosis"]:
     return "diagnosis"
 
 def create_medical_agent_graph():
+    from app.services.agents.nodes.triage import triage_node
+    from app.services.agents.nodes.symptom_analyzer import symptom_analyzer_node
+    from app.services.agents.nodes.image_analyzer import image_analyzer_node
+    from app.services.agents.nodes.diagnostician import diagnostician_node
+    from app.services.agents.nodes.treatment_planner import treatment_planner_node
+    from app.services.agents.nodes.report_generator import report_generator_node
+
     workflow=StateGraph(AgentState)
 
     workflow.add_node("triage",triage_node)
@@ -62,4 +63,12 @@ def create_medical_agent_graph():
 
     return compiled_graph
 
-medical_agent_graph=create_medical_agent_graph()
+
+_medical_agent_graph = None
+
+
+def get_medical_agent_graph():
+    global _medical_agent_graph
+    if _medical_agent_graph is None:
+        _medical_agent_graph = create_medical_agent_graph()
+    return _medical_agent_graph

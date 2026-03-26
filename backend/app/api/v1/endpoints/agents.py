@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from app.db.session import get_db
 from app.db.models import ImageAnalysis
 from app.schemas.agents import DiagnosisRequest, DiagnosisResponse
-from app.services.agents.graph import medical_agent_graph
+from app.services.agents.graph import get_medical_agent_graph
 from app.services.agents.state import AgentState
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,8 @@ async def multi_agent_diagnosis(
         
         logger.info(f"🚀 Starting agent workflow for patient: {request.patient_id or 'Guest'}")
         
-        final_state = await medical_agent_graph.ainvoke(initial_state)
+        graph = get_medical_agent_graph()
+        final_state = await graph.ainvoke(initial_state)
         
         diagnosis_info = final_state.get('diagnosis') or {}
         treatment_info = final_state.get('treatment_plan') or {}
@@ -106,6 +107,7 @@ async def multi_agent_diagnosis(
 @router.get("/health", tags=["System"])
 async def get_workflow_health():
     """Endpoint to verify the agent graph is compiled and ready."""
-    if medical_agent_graph:
+    graph = get_medical_agent_graph()
+    if graph:
         return {"status": "ready", "engine": "LangGraph 0.2+", "agents": 6}
     return {"status": "error", "message": "Graph not initialized"}

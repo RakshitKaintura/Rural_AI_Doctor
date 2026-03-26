@@ -18,9 +18,7 @@ from app.schemas.voice import (
     TTSRequest,
     VoiceDiagnosisResponse
 )
-from app.services.voice.service import voice_service
 from app.services.voice.audio_utils import audio_utils
-from app.services.agents.graph import medical_agent_graph
 from app.services.agents.state import AgentState
 
 logger = logging.getLogger(__name__)
@@ -28,6 +26,7 @@ router = APIRouter()
 
 @router.get("/languages")
 async def get_supported_languages():
+    from app.services.voice.service import voice_service
   
     langs = voice_service.get_languages()
     return {
@@ -42,6 +41,7 @@ async def transcribe_audio(
     session_id: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db)
 ):
+    from app.services.voice.service import voice_service
   
     try:
         # Clean Swagger defaults
@@ -83,6 +83,7 @@ async def transcribe_audio(
 @router.post("/tts")
 @router.post("/speak") 
 async def text_to_speech(request: TTSRequest):
+    from app.services.voice.service import voice_service
 
     try:
        
@@ -104,6 +105,8 @@ async def voice_diagnosis(
     medical_history: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db)
 ):
+    from app.services.voice.service import voice_service
+    from app.services.agents.graph import get_medical_agent_graph
     
     try:
         audio_data = await audio.read()
@@ -120,7 +123,8 @@ async def voice_diagnosis(
             "confidence": 0.0
         }
         
-        final_state = await medical_agent_graph.ainvoke(initial_state)
+        graph = get_medical_agent_graph()
+        final_state = await graph.ainvoke(initial_state)
         
         # Formulate Speech Summary
         diag_name = final_state.get('diagnosis', {}).get('primary_diagnosis', 'a health concern')

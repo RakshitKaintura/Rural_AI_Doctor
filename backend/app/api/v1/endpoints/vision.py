@@ -10,8 +10,6 @@ from app.schemas.vision import (
     XRayAnalysisRequest,
     XRayAnalysisResponse
 )
-from app.services.vision.gemini_vision import gemini_vision
-from app.services.vision.image_processor import image_processor
 from typing import Optional
 import json
 
@@ -26,6 +24,9 @@ async def analyze_medical_image(
     patient_id: Optional[int] = Form(None),
     db: AsyncSession = Depends(get_db)
 ):
+    from app.services.vision.gemini_vision import gemini_vision
+    from app.services.vision.image_processor import image_processor
+
     try:
        
         image_data = await file.read()
@@ -96,6 +97,9 @@ async def analyze_chest_xray(
     """
     Specialized endpoint for chest X-ray analysis
     """
+    from app.services.vision.gemini_vision import gemini_vision
+    from app.services.vision.image_processor import image_processor
+
     try:
         # Read image
         image_data = await file.read()
