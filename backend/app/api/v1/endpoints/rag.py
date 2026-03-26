@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -7,10 +7,9 @@ from pathlib import Path
 import tempfile
 import logging
 import os
-import time
 import asyncio
 
-from app.db.session import get_db, AsyncSessionLocal
+from app.db.session import get_db
 from app.core.config import settings
 from app.db.models import MedicalDocument
 from app.schemas.rag import (
@@ -25,30 +24,6 @@ from app.services.llm.gemini_client import gemini_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-async def background_indexing(file_path: str, filename: str):
-    try:
-        logger.info(f"Starting background indexing for: {filename}")
-        async with AsyncSessionLocal() as db_session:
-            chunks = await document_indexer.index_document(
-                file_path,
-                db_session,
-                custom_metadata={"uploaded_filename": filename}
-            )
-        logger.info(f"Background indexing complete for {filename}: {chunks} chunks added.")
-    except Exception as e:
-        logger.error(f"Background indexing failed for {filename}: {str(e)}")
-    finally:
-        
-        if os.path.exists(file_path):
-            for i in range(5): # Try 5 times
-                try:
-                    os.remove(file_path)
-                    logger.debug(f"Successfully deleted temp file: {file_path}")
-                    break
-                except PermissionError:
-                    logger.debug(f"File locked, retrying deletion ({i+1}/5)...")
-                    await asyncio.sleep(0.5)
 
 @router.get("/stats")
 async def get_index_stats(db: AsyncSession = Depends(get_db)):
@@ -75,7 +50,6 @@ async def get_index_stats(db: AsyncSession = Depends(get_db)):
 
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...), 
     db: AsyncSession = Depends(get_db)
 ):
@@ -103,11 +77,30 @@ async def upload_document(
         with open(tmp_path, 'wb') as tmp:
             shutil.copyfileobj(file.file, tmp)
         
-        background_tasks.add_task(background_indexing, tmp_path, file.filename)
-        
+        logger.info(f"Starting synchronous indexing for: {file.filename}")
+        try:
+            chunks = await asyncio.wait_for(
+                document_indexer.index_document(
+                    tmp_path,
+                    db,
+                    custom_metadata={"uploaded_filename": file.filename}
+                ),
+                timeout=90,
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(
+                status_code=504,
+                detail="Indexing timed out. Try a smaller PDF or upload again."
+            )
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+        logger.info(f"Synchronous indexing complete for {file.filename}: {chunks} chunks added.")
+
         return DocumentUploadResponse(
-            message=f"Upload of '{file.filename}' received. Indexing is running in the background.", 
-            chunks_indexed=0
+            message=f"Upload of '{file.filename}' indexed successfully.",
+            chunks_indexed=chunks,
         )
     except Exception as e:
         logger.error(f"Upload trigger failed: {str(e)}")
