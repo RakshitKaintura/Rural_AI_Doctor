@@ -1,24 +1,32 @@
 from typing import List, Dict, Optional
 from pathlib import Path
 import docx
-from app.core.config import settings
+from pypdf import PdfReader
 
 class DocumentLoader:
     @staticmethod
     def load_pdf(file_path: str) -> Dict:
         """
-        Load PDF and extract as Markdown to preserve clinical document structure.
+        Load PDF with a lightweight extractor first for Render stability.
         """
         try:
+            text_parts: List[str] = []
             try:
-                import pymupdf4llm
-                md_text = pymupdf4llm.to_markdown(file_path)
-                extraction_method = "pymupdf4llm_markdown"
+                reader = PdfReader(file_path)
+                for page in reader.pages:
+                    extracted = page.extract_text() or ""
+                    if extracted.strip():
+                        text_parts.append(extracted)
+                md_text = "\n\n".join(text_parts)
+                extraction_method = "pypdf_text"
             except Exception:
                 import pymupdf
                 doc = pymupdf.open(file_path)
                 md_text = "\n\n".join(page.get_text("text") for page in doc)
                 extraction_method = "pymupdf_text"
+
+            if not md_text.strip():
+                raise Exception("No extractable text found in PDF")
             
             return {
                 "text": md_text,

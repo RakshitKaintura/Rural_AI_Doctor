@@ -26,7 +26,10 @@ class DocumentIndexer:
             Number of chunks successfully indexed.
         """
         logger.info("Indexing started for file: %s", file_path)
-        doc = await asyncio.to_thread(document_loader.load_document, file_path)
+        doc = await asyncio.wait_for(
+            asyncio.to_thread(document_loader.load_document, file_path),
+            timeout=25,
+        )
         
        
         if custom_metadata:
