@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from typing import List, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import MedicalDocument
@@ -5,6 +7,9 @@ from app.services.rag.document_loader import document_loader
 from app.services.rag.chunking import text_chunker
 from app.services.rag.embeddings import embedding_service
 from pathlib import Path
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentIndexer:
@@ -20,23 +25,28 @@ class DocumentIndexer:
         Returns:
             Number of chunks successfully indexed.
         """
-       
-        doc = document_loader.load_document(file_path)
+        doc = await asyncio.to_thread(document_loader.load_document, file_path)
         
        
         if custom_metadata:
             doc["metadata"].update(custom_metadata)
         
         
-        chunks = text_chunker.chunk_text(doc["text"], doc["metadata"])
+        chunks = await asyncio.to_thread(text_chunker.chunk_text, doc["text"], doc["metadata"])
+        if len(chunks) > settings.RAG_MAX_CHUNKS_PER_DOC:
+            logger.warning(
+                "Chunk count exceeded limit (%s > %s). Truncating for stability.",
+                len(chunks),
+                settings.RAG_MAX_CHUNKS_PER_DOC,
+            )
+            chunks = chunks[:settings.RAG_MAX_CHUNKS_PER_DOC]
         
         indexed_count = 0
         
        
         for chunk in chunks:
             try:
-               
-                embedding = embedding_service.embed_query(chunk["text"])
+                embedding = await asyncio.to_thread(embedding_service.embed_query, chunk["text"])
              
                 med_doc = MedicalDocument(
                     title=f"{doc['metadata']['source']} - Chunk {chunk['metadata']['chunk_index']}",
@@ -47,15 +57,20 @@ class DocumentIndexer:
                 
                 db.add(med_doc)
                 indexed_count += 1
-                
-           
+
                 if indexed_count % 50 == 0:
                     await db.commit()
+                if indexed_count % 10 == 0:
+                    await asyncio.sleep(0)
             
             except Exception as e:
-                
                 await db.rollback()
-                print(f"Error indexing chunk {chunk['metadata']['chunk_index']} of {file_path}: {e}")
+                logger.error(
+                    "Error indexing chunk %s of %s: %s",
+                    chunk["metadata"].get("chunk_index"),
+                    file_path,
+                    e,
+                )
                 continue
         
         await db.commit()

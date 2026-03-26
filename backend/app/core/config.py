@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     TOP_K_RESULTS: int = 3
+    RAG_MAX_UPLOAD_MB: int = 8
+    RAG_MAX_CHUNKS_PER_DOC: int = 120
     
     # --- Monitoring & Observability ---
     LANGCHAIN_TRACING_V2: bool = False # Default to False to save on API usage

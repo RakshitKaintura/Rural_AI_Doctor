@@ -54,7 +54,7 @@ def setup_logging(log_level: str = "INFO") -> logging.Logger:
     root_logger.addHandler(error_handler)
     
     # Suppress noisy external library loggers
-    for library in ["httpx", "httpcore", "urllib3", "openai"]:
+    for library in ["httpx", "httpcore", "urllib3", "openai", "python_multipart", "onnxruntime"]:
         logging.getLogger(library).setLevel(logging.WARNING)
     
     logger.info(f"Structured logging initialized at level: {log_level}")

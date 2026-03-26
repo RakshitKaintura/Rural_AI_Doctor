@@ -8,8 +8,10 @@ import tempfile
 import logging
 import os
 import time
+import asyncio
 
-from app.db.session import get_db
+from app.db.session import get_db, AsyncSessionLocal
+from app.core.config import settings
 from app.db.models import MedicalDocument
 from app.schemas.rag import (
     DocumentUploadResponse,
@@ -24,14 +26,15 @@ from app.services.llm.gemini_client import gemini_client
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-async def background_indexing(file_path: str, db_session: AsyncSession, filename: str):
+async def background_indexing(file_path: str, filename: str):
     try:
         logger.info(f"Starting background indexing for: {filename}")
-        chunks = await document_indexer.index_document(
-            file_path, 
-            db_session, 
-            custom_metadata={"uploaded_filename": filename}
-        )
+        async with AsyncSessionLocal() as db_session:
+            chunks = await document_indexer.index_document(
+                file_path,
+                db_session,
+                custom_metadata={"uploaded_filename": filename}
+            )
         logger.info(f"Background indexing complete for {filename}: {chunks} chunks added.")
     except Exception as e:
         logger.error(f"Background indexing failed for {filename}: {str(e)}")
@@ -45,7 +48,7 @@ async def background_indexing(file_path: str, db_session: AsyncSession, filename
                     break
                 except PermissionError:
                     logger.debug(f"File locked, retrying deletion ({i+1}/5)...")
-                    time.sleep(0.5)
+                    await asyncio.sleep(0.5)
 
 @router.get("/stats")
 async def get_index_stats(db: AsyncSession = Depends(get_db)):
@@ -82,6 +85,17 @@ async def upload_document(
         if file_ext not in ['.pdf', '.txt', '.docx']:
              raise HTTPException(status_code=400, detail="Unsupported file format.")
 
+        # Render free instances are memory constrained; bound upload size for stable indexing.
+        file.file.seek(0, os.SEEK_END)
+        file_size = file.file.tell()
+        file.file.seek(0)
+        max_size_bytes = settings.RAG_MAX_UPLOAD_MB * 1024 * 1024
+        if file_size > max_size_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Max allowed size is {settings.RAG_MAX_UPLOAD_MB} MB."
+            )
+
       
         fd, tmp_path = tempfile.mkstemp(suffix=file_ext)
         os.close(fd) 
@@ -89,7 +103,7 @@ async def upload_document(
         with open(tmp_path, 'wb') as tmp:
             shutil.copyfileobj(file.file, tmp)
         
-        background_tasks.add_task(background_indexing, tmp_path, db, file.filename)
+        background_tasks.add_task(background_indexing, tmp_path, file.filename)
         
         return DocumentUploadResponse(
             message=f"Upload of '{file.filename}' received. Indexing is running in the background.", 
