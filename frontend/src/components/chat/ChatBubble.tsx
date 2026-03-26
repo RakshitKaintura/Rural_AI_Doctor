@@ -8,6 +8,12 @@ interface ChatBubbleProps {
 
 export function ChatBubble({ message }: ChatBubbleProps) {
   const isUser = message.role === 'user';
+  const parsedTimestamp = message.timestamp instanceof Date
+    ? message.timestamp
+    : new Date(message.timestamp as unknown as string);
+  const timeLabel = Number.isNaN(parsedTimestamp.getTime())
+    ? 'Unknown time'
+    : parsedTimestamp.toLocaleTimeString();
 
   return (
     <div className={cn(
@@ -38,7 +44,7 @@ export function ChatBubble({ message }: ChatBubbleProps) {
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         </div>
         <span className="text-xs text-gray-500 mt-1">
-          {message.timestamp.toLocaleTimeString()}
+          {timeLabel}
         </span>
       </div>
     </div>

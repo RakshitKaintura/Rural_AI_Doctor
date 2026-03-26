@@ -35,6 +35,20 @@ export const useChatStore = create<ChatState>()(
     {
       name: 'chat-storage', // unique name
       partialize: (state) => ({ sessionId: state.sessionId, messages: state.messages }), // Only persist these
+      merge: (persistedState, currentState) => {
+        const typed = (persistedState as Partial<ChatState>) || {};
+        const normalizedMessages = (typed.messages || []).map((message) => ({
+          ...message,
+          // Persist serializes Date to string; restore Date on hydration.
+          timestamp: new Date(message.timestamp as unknown as string),
+        }));
+
+        return {
+          ...currentState,
+          ...typed,
+          messages: normalizedMessages,
+        };
+      },
     }
   )
 );
