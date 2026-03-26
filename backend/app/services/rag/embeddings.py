@@ -14,9 +14,9 @@ class EmbeddingService:
     Optimized for RAG (Retrieval-Augmented Generation) in medical contexts.
     """
     def __init__(self):
-        # text-multilingual-embedding-002 is highly effective for rural contexts
-        # where medical symptoms might be described in regional dialects or mixed languages.
-        self.model_name = "models/text-multilingual-embedding-002" 
+        # Keep dimensions aligned with pgvector column definition (Vector(768)).
+        self.model_name = settings.EMBEDDING_MODEL
+        self.fallback_model_name = "models/text-multilingual-embedding-002"
         self.dimensions = 768 
         self.client = None
 
@@ -42,18 +42,42 @@ class EmbeddingService:
             # Call the Gemini Embedding API
             # Task types (RETRIEVAL_DOCUMENT vs RETRIEVAL_QUERY) optimize the 
             # vector space for better matching.
-            response = client.models.embed_content(
-                model=self.model_name,
-                contents=clean_text,
-                config=types.EmbedContentConfig(
-                    task_type=task_type,
-                    output_dimensionality=self.dimensions
+            try:
+                response = client.models.embed_content(
+                    model=self.model_name,
+                    contents=clean_text,
+                    config=types.EmbedContentConfig(
+                        task_type=task_type,
+                        output_dimensionality=self.dimensions
+                    )
                 )
-            )
+            except Exception as primary_error:
+                logger.warning(
+                    "Primary embedding model failed (%s). Falling back to %s. Error: %s",
+                    self.model_name,
+                    self.fallback_model_name,
+                    primary_error,
+                )
+                response = client.models.embed_content(
+                    model=self.fallback_model_name,
+                    contents=clean_text,
+                    config=types.EmbedContentConfig(
+                        task_type=task_type,
+                        output_dimensionality=self.dimensions
+                    )
+                )
             
             if response and response.embeddings:
                 # Return the values for the first content item
-                return response.embeddings[0].values
+                values = response.embeddings[0].values
+                if len(values) != self.dimensions:
+                    logger.error(
+                        "Embedding dimension mismatch. Expected %s, got %s",
+                        self.dimensions,
+                        len(values),
+                    )
+                    return []
+                return values
             
             logger.warning(f"Empty embedding returned for model {self.model_name}")
             return []

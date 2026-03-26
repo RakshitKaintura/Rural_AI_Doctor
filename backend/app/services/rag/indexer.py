@@ -25,6 +25,7 @@ class DocumentIndexer:
         Returns:
             Number of chunks successfully indexed.
         """
+        logger.info("Indexing started for file: %s", file_path)
         doc = await asyncio.to_thread(document_loader.load_document, file_path)
         
        
@@ -33,6 +34,7 @@ class DocumentIndexer:
         
         
         chunks = await asyncio.to_thread(text_chunker.chunk_text, doc["text"], doc["metadata"])
+        logger.info("Extracted %s chunks from %s", len(chunks), file_path)
         if len(chunks) > settings.RAG_MAX_CHUNKS_PER_DOC:
             logger.warning(
                 "Chunk count exceeded limit (%s > %s). Truncating for stability.",
@@ -42,11 +44,19 @@ class DocumentIndexer:
             chunks = chunks[:settings.RAG_MAX_CHUNKS_PER_DOC]
         
         indexed_count = 0
+        failed_count = 0
         
        
         for chunk in chunks:
             try:
-                embedding = await asyncio.to_thread(embedding_service.embed_query, chunk["text"])
+                embedding = await asyncio.to_thread(embedding_service.embed_text, chunk["text"])
+                if not embedding:
+                    failed_count += 1
+                    logger.warning(
+                        "Skipping chunk %s due to empty/invalid embedding",
+                        chunk["metadata"].get("chunk_index"),
+                    )
+                    continue
              
                 med_doc = MedicalDocument(
                     title=f"{doc['metadata']['source']} - Chunk {chunk['metadata']['chunk_index']}",
@@ -65,6 +75,7 @@ class DocumentIndexer:
             
             except Exception as e:
                 await db.rollback()
+                failed_count += 1
                 logger.error(
                     "Error indexing chunk %s of %s: %s",
                     chunk["metadata"].get("chunk_index"),
@@ -74,6 +85,12 @@ class DocumentIndexer:
                 continue
         
         await db.commit()
+        logger.info(
+            "Indexing finished for %s. Inserted: %s, Failed: %s",
+            file_path,
+            indexed_count,
+            failed_count,
+        )
         return indexed_count
 
     async def index_directory(
