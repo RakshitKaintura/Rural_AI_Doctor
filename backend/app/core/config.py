@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = 'gemini-3.1-flash-lite-preview' 
     
     # UPDATED: Use the new multimodal embedding model
-    EMBEDDING_MODEL: str = "models/gemini-embedding-2-preview"
+    EMBEDDING_MODEL: str = "models/text-embedding-004"
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     TOP_K_RESULTS: int = 3

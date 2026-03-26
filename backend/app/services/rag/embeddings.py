@@ -16,9 +16,15 @@ class EmbeddingService:
     def __init__(self):
         # Keep dimensions aligned with pgvector column definition (Vector(768)).
         self.model_name = settings.EMBEDDING_MODEL
-        self.fallback_model_name = "models/text-multilingual-embedding-002"
+        self.fallback_model_names = [
+            "models/text-embedding-004",
+            "models/embedding-001",
+            "text-embedding-004",
+            "embedding-001",
+        ]
         self.dimensions = 768 
         self.client = None
+        self._unavailable_models_logged = set()
 
     def _get_client(self):
         if self.client is not None:
@@ -39,33 +45,35 @@ class EmbeddingService:
                 logger.warning("Attempted to embed an empty string.")
                 return []
 
-            # Call the Gemini Embedding API
-            # Task types (RETRIEVAL_DOCUMENT vs RETRIEVAL_QUERY) optimize the 
-            # vector space for better matching.
-            try:
-                response = client.models.embed_content(
-                    model=self.model_name,
-                    contents=clean_text,
-                    config=types.EmbedContentConfig(
-                        task_type=task_type,
-                        output_dimensionality=self.dimensions
+            response = None
+            candidate_models = [self.model_name] + [
+                model for model in self.fallback_model_names if model != self.model_name
+            ]
+
+            last_error = None
+            for model in candidate_models:
+                try:
+                    response = client.models.embed_content(
+                        model=model,
+                        contents=clean_text,
+                        config=types.EmbedContentConfig(
+                            task_type=task_type,
+                            output_dimensionality=self.dimensions,
+                        ),
                     )
-                )
-            except Exception as primary_error:
-                logger.warning(
-                    "Primary embedding model failed (%s). Falling back to %s. Error: %s",
-                    self.model_name,
-                    self.fallback_model_name,
-                    primary_error,
-                )
-                response = client.models.embed_content(
-                    model=self.fallback_model_name,
-                    contents=clean_text,
-                    config=types.EmbedContentConfig(
-                        task_type=task_type,
-                        output_dimensionality=self.dimensions
-                    )
-                )
+                    break
+                except Exception as model_error:
+                    last_error = model_error
+                    if model not in self._unavailable_models_logged:
+                        logger.warning(
+                            "Embedding model unavailable (%s): %s",
+                            model,
+                            model_error,
+                        )
+                        self._unavailable_models_logged.add(model)
+
+            if response is None:
+                raise RuntimeError(f"No working embedding model found: {last_error}")
             
             if response and response.embeddings:
                 # Return the values for the first content item
@@ -79,11 +87,11 @@ class EmbeddingService:
                     return []
                 return values
             
-            logger.warning(f"Empty embedding returned for model {self.model_name}")
+            logger.warning("Empty embedding returned from provider")
             return []
             
         except Exception as e:
-            logger.error(f"Embedding failed for {self.model_name}: {str(e)}")
+            logger.error(f"Embedding failed: {str(e)}")
             return []
 
     def embed_text(self, text: str) -> List[float]:
