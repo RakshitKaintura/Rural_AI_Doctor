@@ -2,9 +2,6 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from app.services.agents.state import AgentState
 from app.services.llm.gemini_client import gemini_client
-from app.services.rag.retriever import vector_retriever
-from app.db.session import SessionLocal
-from app.schemas.agents import DiagnosisResponse
 
 class DiagnosisAssessment(BaseModel):
     """Structured schema for clinical diagnosis and reasoning."""
@@ -41,27 +38,12 @@ async def diagnostician_node(state: AgentState) -> AgentState:
         )
 
 
-    query_terms = analysis.get('primary_symptoms', []) + vision.get('clinical_findings', [])
-    search_query = " ".join(query_terms) if query_terms else raw_text
-
     retrieved_docs = []
-    rag_text = "No specific medical guidelines found in local database."
-    
-    try:
-        with SessionLocal() as db:
-            retrieved_docs = vector_retriever.search(search_query, db, top_k=3)
-            if retrieved_docs:
-                rag_text = "\n".join([
-                    f"Guideline [{i+1}] (Source: {doc['title']}): {doc['text'][:800]}" 
-                    for i, doc in enumerate(retrieved_docs)
-                ])
-    except Exception as db_err:
-        print(f"⚠️ RAG Search Error: {db_err}")
-        rag_text = "Knowledge base temporarily unavailable."
+    rag_text = "Knowledge base feature has been disabled for this deployment."
 
 
     system_prompt = f"""You are a senior clinical diagnostician. 
-    Analyze the patient data and local medical guidelines to provide a structured diagnosis.
+    Analyze the patient data to provide a structured diagnosis.
     
     [PATIENT DATA]
     {context_str}
@@ -69,8 +51,7 @@ async def diagnostician_node(state: AgentState) -> AgentState:
     [MEDICAL GUIDELINES (RAG)]
     {rag_text}
     
-    Focus on grounding your diagnosis in the provided guidelines. If the guidelines 
-    contradict the symptoms, prioritize clinical safety and list differentials.
+    Prioritize clinical safety and list reasonable differentials.
     """
 
     try:
