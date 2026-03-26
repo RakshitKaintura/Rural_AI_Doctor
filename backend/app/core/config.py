@@ -52,12 +52,14 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_url(cls, v: str) -> str:
-        """Fix async driver definition for Render and similar PaaS"""
+        """Normalize Postgres URLs to an AsyncEngine-compatible driver."""
         if isinstance(v, str):
             if v.startswith("postgres://"):
-                v = v.replace("postgres://", "postgresql+psycopg://", 1)
+                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
             elif v.startswith("postgresql://"):
-                v = v.replace("postgresql://", "postgresql+psycopg://", 1)
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            elif v.startswith("postgresql+psycopg://"):
+                v = v.replace("postgresql+psycopg://", "postgresql+asyncpg://", 1)
         return v
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")

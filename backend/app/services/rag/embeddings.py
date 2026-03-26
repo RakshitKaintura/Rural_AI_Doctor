@@ -8,11 +8,6 @@ from app.core.config import settings
 # Initialize logging for production monitoring
 logger = logging.getLogger(__name__)
 
-# Initialize the Gemini Client using the centralized configuration
-client = genai.Client(
-    api_key=settings.GOOGLE_API_KEY
-)
-
 class EmbeddingService:
     """
     Service for generating vector embeddings via Gemini API.
@@ -23,12 +18,22 @@ class EmbeddingService:
         # where medical symptoms might be described in regional dialects or mixed languages.
         self.model_name = "models/text-multilingual-embedding-002" 
         self.dimensions = 768 
+        self.client = None
+
+    def _get_client(self):
+        if self.client is not None:
+            return self.client
+        if not settings.GOOGLE_API_KEY:
+            raise RuntimeError("GOOGLE_API_KEY is not configured")
+        self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        return self.client
 
     def _get_embedding(self, text: str, task_type: str) -> List[float]:
         """
         Internal method to fetch embeddings with specific task types.
         """
         try:
+            client = self._get_client()
             clean_text = text.strip()
             if not clean_text:
                 logger.warning("Attempted to embed an empty string.")
@@ -77,6 +82,7 @@ class EmbeddingService:
         Significantly reduces API latency and prevents rate-limit hits.
         """
         try:
+            client = self._get_client()
             # Filter empty strings to avoid API errors
             valid_texts = [t.strip() for t in texts if t.strip()]
             if not valid_texts:

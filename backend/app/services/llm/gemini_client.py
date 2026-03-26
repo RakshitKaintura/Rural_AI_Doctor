@@ -8,23 +8,31 @@ T = TypeVar("T")
 
 class GeminiClient:
     def __init__(self):
-        # Set environment variable for LangChain internal use
-        if settings.GOOGLE_API_KEY:
-            os.environ["GOOGLE_API_KEY"] = settings.GOOGLE_API_KEY
-        
-        # Using 1.5-flash for stability and lower memory footprint on Render
+        self.llm: Optional[ChatGoogleGenerativeAI] = None
+
+    def _get_llm(self) -> ChatGoogleGenerativeAI:
+        """Create the LLM client lazily to avoid crashing application startup."""
+        if self.llm is not None:
+            return self.llm
+
+        if not settings.GOOGLE_API_KEY:
+            raise RuntimeError("GOOGLE_API_KEY is not configured")
+
+        os.environ["GOOGLE_API_KEY"] = settings.GOOGLE_API_KEY
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-3.1-flash-lite-preview", 
+            model="gemini-3.1-flash-lite-preview",
             google_api_key=settings.GOOGLE_API_KEY,
             temperature=0.1,
-            max_retries=2
+            max_retries=2,
         )
+        return self.llm
     
     async def chat(
         self,
         messages: List[Dict[str, str]],
         system_prompt: Optional[str] = None
     ) -> str:
+        llm = self._get_llm()
         lc_messages = []
         
         if system_prompt:
@@ -38,12 +46,13 @@ class GeminiClient:
             elif role == "assistant":
                 lc_messages.append(AIMessage(content=content))
         
-        response = await self.llm.ainvoke(lc_messages)
+        response = await llm.ainvoke(lc_messages)
         return response.content
     
     async def generate(self, prompt: str) -> str:
         """Standard text generation."""
-        response = await self.llm.ainvoke([HumanMessage(content=prompt)])
+        llm = self._get_llm()
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
         return response.content
 
     async def generate_structured(self, prompt: str, response_model: Type[T]) -> T:
@@ -51,8 +60,9 @@ class GeminiClient:
         Generates a structured response mapped to a Pydantic model.
         Fixes the AttributeError in agent nodes by using LangChain's native parser.
         """
+        llm = self._get_llm()
         # .with_structured_output handles the JSON schema conversion automatically
-        structured_llm = self.llm.with_structured_output(response_model)
+        structured_llm = llm.with_structured_output(response_model)
         
         response = await structured_llm.ainvoke([HumanMessage(content=prompt)])
         

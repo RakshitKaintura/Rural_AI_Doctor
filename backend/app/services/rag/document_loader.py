@@ -1,6 +1,5 @@
 from typing import List, Dict, Optional
 from pathlib import Path
-import pymupdf4llm 
 import docx
 from app.core.config import settings
 
@@ -11,14 +10,22 @@ class DocumentLoader:
         Load PDF and extract as Markdown to preserve clinical document structure.
         """
         try:
-            md_text = pymupdf4llm.to_markdown(file_path)
+            try:
+                import pymupdf4llm
+                md_text = pymupdf4llm.to_markdown(file_path)
+                extraction_method = "pymupdf4llm_markdown"
+            except Exception:
+                import pymupdf
+                doc = pymupdf.open(file_path)
+                md_text = "\n\n".join(page.get_text("text") for page in doc)
+                extraction_method = "pymupdf_text"
             
             return {
                 "text": md_text,
                 "metadata": {
                     "source": Path(file_path).name,
                     "type": "pdf",
-                    "extraction_method": "pymupdf4llm_markdown"
+                    "extraction_method": extraction_method
                 }
             }
         except Exception as e:

@@ -19,7 +19,7 @@ class VoiceService:
         clean_lang = None if language in ["string", ""] else language
         
         # Using the internal method from your whisper_service.py
-        result = self.whisper_service.transcribe_audio(audio_data, language=clean_lang)
+        result = await self.whisper_service.transcribe_audio(audio_data, language=clean_lang)
         return result.get("text", "")
 
     async def generate_speech(self, text: str, language: str = "en", slow: bool = False) -> bytes:

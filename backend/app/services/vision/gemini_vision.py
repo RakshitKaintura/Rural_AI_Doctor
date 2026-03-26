@@ -1,20 +1,23 @@
 
 from google import genai
-from google.genai.types import GenerateContentConfig, Part
 from app.core.config import settings
 from typing import Dict, List, Optional
 import base64
 from pathlib import Path
 from google.genai import types
 
-
-# Initialize client
-client = genai.Client(api_key=settings.GOOGLE_API_KEY)
-
-
 class GeminiVisionService:
     def __init__(self):
         self.model_name ="gemini-3.1-flash-lite-preview"
+        self.client = None
+
+    def _get_client(self):
+        if self.client is not None:
+            return self.client
+        if not settings.GOOGLE_API_KEY:
+            raise RuntimeError("GOOGLE_API_KEY is not configured")
+        self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        return self.client
     
     async def analyze_medical_image(
     self,
@@ -35,8 +38,7 @@ class GeminiVisionService:
             Dict with analysis results
         """
         
-        # Encode image to base64
-        image_base64 = base64.b64encode(image_data).decode('utf-8')
+        client = self._get_client()
         
         # Create prompt based on image type
         prompt = self._create_analysis_prompt(image_type, additional_context)

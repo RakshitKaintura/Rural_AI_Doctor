@@ -17,10 +17,17 @@ class WhisperService:
         Cloud-based transcription service using Gemini 1.5 Flash.
         Saves ~600MB RAM compared to local Whisper models.
         """
-        # CORRECT V2 SYNTAX: Initialize the Client
-        self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        self.client = None
         self.model_id = 'gemini-3.1-flash-lite-preview'  # Stable multimodal production standard
+
+    def _get_client(self):
+        if self.client is not None:
+            return self.client
+        if not settings.GOOGLE_API_KEY:
+            raise RuntimeError("GOOGLE_API_KEY is not configured")
+        self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         logger.info("🎙️ Cloud Voice Service (Gemini V2 SDK) initialized")
+        return self.client
 
     async def transcribe_audio(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
         """
@@ -67,6 +74,7 @@ class WhisperService:
         """
         Standardizes audio and sends it to Gemini Cloud for transcription.
         """
+        client = self._get_client()
         # Create a temporary file with a proper extension
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             tmp_path = tmp.name
@@ -79,20 +87,20 @@ class WhisperService:
             audio.export(tmp_path, format="wav")
 
             # 2. CORRECT V2 SYNTAX: Upload to Gemini via client
-            uploaded_file = self.client.files.upload(path=tmp_path)
+            uploaded_file = client.files.upload(path=tmp_path)
             
             # 3. CORRECT V2 SYNTAX: Generate transcription
             prompt = "Transcribe the following medical audio accurately."
             if language:
                 prompt += f" The expected language is {language}."
                 
-            response = self.client.models.generate_content(
+            response = client.models.generate_content(
                 model=self.model_id,
                 contents=[prompt, uploaded_file]
             )
             
             # 4. CORRECT V2 SYNTAX: Clean up file
-            self.client.files.delete(name=uploaded_file.name)
+            client.files.delete(name=uploaded_file.name)
 
             return {
                 "text": response.text.strip(),
