@@ -1,5 +1,6 @@
 import os
 import sys
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
@@ -36,7 +37,19 @@ except ImportError:
 config = context.config
 
 # 6. Dynamically set the database URL from your .env file
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+database_url = settings.DATABASE_URL
+if database_url.startswith("postgresql+asyncpg://"):
+    database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+
+    split = urlsplit(database_url)
+    filtered = [
+        (k, v)
+        for k, v in parse_qsl(split.query, keep_blank_values=True)
+        if k not in {"prepared_statement_cache_size", "statement_cache_size"}
+    ]
+    database_url = urlunsplit((split.scheme, split.netloc, split.path, urlencode(filtered), split.fragment))
+
+config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

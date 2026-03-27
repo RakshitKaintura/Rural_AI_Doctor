@@ -1,8 +1,6 @@
 import io
 import logging
 from typing import Optional, Tuple
-from pydub import AudioSegment
-import noisereduce as nr
 import numpy as np
 
 # Configuration & Logging
@@ -19,6 +17,7 @@ class AudioUtils:
     def get_audio_duration(audio_data: bytes) -> float:
         """Get duration of audio in seconds safely."""
         try:
+            from pydub import AudioSegment
             audio = AudioSegment.from_file(io.BytesIO(audio_data))
             return len(audio) / 1000.0
         except Exception as e:
@@ -40,6 +39,7 @@ class AudioUtils:
             return False, "Audio file is too small or empty."
 
         try:
+            from pydub import AudioSegment
             audio = AudioSegment.from_file(io.BytesIO(audio_data))
             duration = len(audio) / 1000.0
             
@@ -63,6 +63,8 @@ class AudioUtils:
         4. Normalization
         """
         try:
+            from pydub import AudioSegment
+            import noisereduce as nr
           
             audio = AudioSegment.from_file(io.BytesIO(audio_data))
             audio = audio.set_channels(1).set_frame_rate(16000).set_sample_width(2)

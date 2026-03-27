@@ -71,3 +71,25 @@ pytest-cov
 pytest-mock
 faker
 google-genai
+
+# AUTHENTICATION & AUTHORIZATION (NEW)
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+bcrypt==4.2.1
+
+# EMAIL (NEW)
+fastapi-mail
+jinja2
+
+# PDF GENERATION (NEW)
+reportlab
+pypdf
+weasyprint
+
+# EXCEL EXPORT (NEW)
+openpyxl
+xlsxwriter
+
+# SCHEDULING (NEW)
+apscheduler

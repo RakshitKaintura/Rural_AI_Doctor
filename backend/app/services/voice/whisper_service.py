@@ -4,7 +4,6 @@ import logging
 import tempfile
 from google import genai
 from typing import Dict, Optional, Any
-from pydub import AudioSegment
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import VoiceInteraction
 from app.core.config import settings
@@ -75,6 +74,8 @@ class WhisperService:
         Standardizes audio and sends it to Gemini Cloud for transcription.
         """
         client = self._get_client()
+        from pydub import AudioSegment
+
         # Create a temporary file with a proper extension
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             tmp_path = tmp.name

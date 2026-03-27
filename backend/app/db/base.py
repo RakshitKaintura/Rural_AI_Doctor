@@ -1,8 +1,3 @@
-from app.db.models import (
-    Base,
-    Patient, 
-    ChatHistory, 
-    Diagnosis, 
-    VoiceInteraction, 
-    MedicalDocument
-)
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
