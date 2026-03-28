@@ -10,9 +10,16 @@ import argparse
 import asyncio
 import getpass
 import logging
+import sys
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# Ensure `app` package is importable when executing `python scripts/...`.
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.security import get_password_hash
 from app.db.models import User

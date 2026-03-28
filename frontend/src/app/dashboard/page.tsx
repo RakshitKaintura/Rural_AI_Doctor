@@ -6,14 +6,19 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function DashboardRoutePage() {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push('/login');
+      return;
     }
-  }, [isAuthenticated, loading, router]);
+
+    if (!loading && isAuthenticated && user?.role === 'admin') {
+      router.push('/admin');
+    }
+  }, [isAuthenticated, loading, router, user]);
 
   if (loading) {
     return <div className="p-8">Loading...</div>;
@@ -21,6 +26,10 @@ export default function DashboardRoutePage() {
 
   if (!isAuthenticated) {
     return null;
+  }
+
+  if (user?.role === 'admin') {
+    return <div className="p-8">Redirecting to admin dashboard...</div>;
   }
 
   return (

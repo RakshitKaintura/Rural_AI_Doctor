@@ -16,6 +16,11 @@ export interface AdminStats {
   };
 }
 
+interface DistributionResponse {
+  severity: Record<string, number>;
+  urgency: Record<string, number>;
+}
+
 export const adminAPI = {
   getOverview: async (): Promise<AdminStats> => {
     const response = await apiClient.get('/admin/stats/overview');
@@ -30,13 +35,13 @@ export const adminAPI = {
   },
 
   getSeverityDistribution: async () => {
-    const response = await apiClient.get('/admin/stats/severity-distribution');
-    return response.data;
+    const response = await apiClient.get<DistributionResponse>('/admin/stats/distribution');
+    return response.data.severity;
   },
 
   getUrgencyDistribution: async () => {
-    const response = await apiClient.get('/admin/stats/urgency-distribution');
-    return response.data;
+    const response = await apiClient.get<DistributionResponse>('/admin/stats/distribution');
+    return response.data.urgency;
   },
 
   getRecentUsers: async (limit: number = 10) => {
