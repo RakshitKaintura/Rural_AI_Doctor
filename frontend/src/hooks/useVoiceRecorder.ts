@@ -27,7 +27,13 @@ export function useVoiceRecorder({
    * Standard webm works for Chrome/Firefox, while mp4/wav is safer for Safari.
    */
   const getSupportedMimeType = () => {
-    const types = ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/wav'];
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+      'audio/ogg',
+    ];
     for (const type of types) {
       if (MediaRecorder.isTypeSupported(type)) return type;
     }
@@ -42,7 +48,9 @@ export function useVoiceRecorder({
 
       // 2. Setup MediaRecorder
       const mimeType = getSupportedMimeType();
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
       
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
@@ -54,7 +62,14 @@ export function useVoiceRecorder({
       };
 
       mediaRecorder.onstop = () => {
-        const finalBlob = new Blob(chunksRef.current, { type: mimeType });
+        if (chunksRef.current.length === 0) {
+          console.error('No audio chunks captured from recorder.');
+          alert('Recording failed. Please try again and allow microphone access.');
+          return;
+        }
+
+        const blobType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+        const finalBlob = new Blob(chunksRef.current, { type: blobType });
         setAudioBlob(finalBlob);
         
         if (onRecordingComplete) {

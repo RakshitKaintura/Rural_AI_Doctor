@@ -13,17 +13,20 @@ import {
   Loader2, 
   CheckCircle, 
   AlertCircle,
-  X
+  X,
+  Download
 } from 'lucide-react';
 import { visionAPI, XRayAnalysisResponse } from '@/lib/api/vision';
 import { getApiBaseUrl } from '@/lib/api/base-url';
 import Image from 'next/image';
+import jsPDF from 'jspdf';
 
 export function XRayUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<XRayAnalysisResponse | null>(null);
+  const [downloading, setDownloading] = useState(false);
   
   // Form fields
   const [symptoms, setSymptoms] = useState('');
@@ -32,10 +35,89 @@ export function XRayUpload() {
   const [medicalHistory, setMedicalHistory] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const generateAndDownloadReport = (analysis: XRayAnalysisResponse) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 18;
+
+    const ensurePage = (extraHeight: number = 8) => {
+      if (y + extraHeight > 280) {
+        doc.addPage();
+        y = 18;
+      }
+    };
+
+    const writeWrapped = (text: string, fontSize: number = 11) => {
+      const lines = doc.splitTextToSize(text, contentWidth);
+      doc.setFontSize(fontSize);
+      for (const line of lines) {
+        ensurePage(7);
+        doc.text(line, margin, y);
+        y += 6;
+      }
+    };
+
+    doc.setFontSize(16);
+    doc.text('Rural AI Doctor - X-Ray Analysis Report', margin, y);
+    y += 10;
+
+    doc.setFontSize(10);
+    doc.text(`Report ID: ${analysis.analysis_id}`, margin, y);
+    y += 6;
+    doc.text(`Severity: ${analysis.severity}`, margin, y);
+    y += 6;
+    doc.text(`Confidence: ${(analysis.confidence * 100).toFixed(0)}%`, margin, y);
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.text('Key Findings', margin, y);
+    y += 7;
+    if (analysis.findings.length > 0) {
+      analysis.findings.forEach((finding) => {
+        writeWrapped(`- ${finding}`);
+      });
+    } else {
+      writeWrapped('- No key findings were generated.');
+    }
+
+    y += 4;
+    ensurePage(10);
+    doc.setFontSize(12);
+    doc.text('Differential Diagnosis', margin, y);
+    y += 7;
+    if (analysis.differential_diagnosis.length > 0) {
+      analysis.differential_diagnosis.forEach((item) => {
+        writeWrapped(`- ${item}`);
+      });
+    } else {
+      writeWrapped('- No differential diagnosis provided.');
+    }
+
+    y += 4;
+    ensurePage(10);
+    doc.setFontSize(12);
+    doc.text('Recommendations', margin, y);
+    y += 7;
+    writeWrapped(analysis.recommendations || 'No recommendations provided.');
+
+    y += 6;
+    ensurePage(14);
+    doc.setFontSize(9);
+    writeWrapped(
+      'Disclaimer: This AI analysis is for informational purposes only and does not replace professional medical advice.'
+    , 9);
+
+    doc.save(`Medical_Report_${analysis.analysis_id}.pdf`);
+  };
+
   const handleDownloadPDF = async () => {
     if (!result?.analysis_id) return;
 
     try {
+      setDownloading(true);
       const API_BASE_URL = getApiBaseUrl();
       const response = await fetch(`${API_BASE_URL}/vision/analysis/${result.analysis_id}/pdf`);
       
@@ -52,8 +134,10 @@ export function XRayUpload() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download error:', error);
-      alert('Could not download the report. Please try again.');
+      // Fallback to client-side PDF generation when backend PDF endpoint is unavailable.
+      generateAndDownloadReport(result);
+    } finally {
+      setDownloading(false);
     }
   };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -283,10 +367,10 @@ export function XRayUpload() {
           )}
 
           {/* Summary Card */}
-          <Card className="p-6">
+          <Card className="p-6 overflow-hidden">
             <div className="flex items-start justify-between mb-4">
               <h3 className="text-lg font-semibold">Analysis Results</h3>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap justify-end max-w-full">
                 <Badge className={getSeverityColor(result.severity)}>
                   {result.severity.toUpperCase()}
                 </Badge>
@@ -294,6 +378,27 @@ export function XRayUpload() {
                   {(result.confidence * 100).toFixed(0)}% Confidence
                 </Badge>
               </div>
+            </div>
+
+            <div className="mb-4 flex justify-end">
+              <Button
+                onClick={handleDownloadPDF}
+                variant="outline"
+                size="sm"
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Preparing Report...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Report (PDF)
+                  </>
+                )}
+              </Button>
             </div>
 
             {/* Key Findings */}
@@ -305,7 +410,7 @@ export function XRayUpload() {
                 </h4>
                 <ul className="space-y-1">
                   {result.findings.map((finding, idx) => (
-                    <li key={idx} className="text-sm text-gray-700 pl-6">
+                    <li key={idx} className="text-sm text-gray-700 pl-6 wrap-break-word">
                       • {finding}
                     </li>
                   ))}
@@ -319,7 +424,7 @@ export function XRayUpload() {
                 <h4 className="font-medium mb-2">Differential Diagnosis</h4>
                 <div className="flex flex-wrap gap-2">
                   {result.differential_diagnosis.map((diagnosis, idx) => (
-                    <Badge key={idx} variant="outline">
+                    <Badge key={idx} variant="outline" className="max-w-full whitespace-normal wrap-break-word text-left leading-snug">
                       {diagnosis}
                     </Badge>
                   ))}
@@ -331,7 +436,7 @@ export function XRayUpload() {
             {result.recommendations && (
               <div className="mb-4">
                 <h4 className="font-medium mb-2">Recommendations</h4>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                <p className="text-sm text-gray-700 whitespace-pre-wrap wrap-break-word">
                   {result.recommendations}
                 </p>
               </div>
@@ -342,8 +447,8 @@ export function XRayUpload() {
               <summary className="cursor-pointer font-medium text-sm text-blue-600 hover:text-blue-700">
                 View Detailed Analysis
               </summary>
-              <div className="mt-3 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">
+              <div className="mt-3 p-4 bg-gray-50 rounded-lg overflow-hidden">
+                <p className="text-sm text-gray-800 whitespace-pre-wrap wrap-break-word">
                   {result.analysis}
                 </p>
               </div>

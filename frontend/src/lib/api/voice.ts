@@ -59,7 +59,7 @@ export const voiceAPI = {
 
   /**
    * The "Magic" Endpoint: Voice input -> Full Clinical Diagnosis
-   * Aligned with: async def voice_diagnosis(audio_file: UploadFile = File(...))
+    * Aligned with backend: async def voice_diagnosis(audio: UploadFile = File(...))
    */
   voiceDiagnosis: async (
     audioFile: File | Blob,
@@ -70,8 +70,8 @@ export const voiceAPI = {
   ): Promise<VoiceDiagnosisResponse> => {
     const formData = new FormData();
     
-    // 1. Audio File (Must match 'audio_file' key in FastAPI)
-    formData.append('audio_file', audioFile, 'consultation.wav');
+    // 1. Audio File (Must match backend key: 'audio')
+    formData.append('audio', audioFile, 'consultation.webm');
     
     // 2. Language
     formData.append('language', language || 'en');

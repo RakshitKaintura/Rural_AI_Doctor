@@ -25,6 +25,7 @@ export function VoiceDiagnosis() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<VoiceDiagnosisResponse | null>(null);
   const [playingAudio, setPlayingAudio] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [language, setLanguage] = useState('en');
   const [age, setAge] = useState('');
@@ -33,13 +34,20 @@ export function VoiceDiagnosis() {
 
   const handleRecordingComplete = (blob: Blob) => {
     setAudioBlob(blob);
+    setError(null);
     setResult(null); // Clear old results when new audio is recorded
   };
 
   const handleSubmit = async () => {
     if (!audioBlob) return;
 
+    if (!age || !gender.trim()) {
+      setError('Age and gender are required for voice diagnosis.');
+      return;
+    }
+
     try {
+      setError(null);
       setProcessing(true);
       
       // Ensure age is passed as a number or undefined, not an empty string
@@ -60,8 +68,10 @@ export function VoiceDiagnosis() {
       }
       
     } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      const message = typeof detail === 'string' ? detail : 'Voice diagnosis failed. Please try again.';
       console.error('Diagnosis failed:', error);
-      // Optional: Add a toast notification here for "Validation Error (422)"
+      setError(message);
     } finally {
       setProcessing(false);
     }
@@ -138,6 +148,12 @@ export function VoiceDiagnosis() {
       </Card>
 
       <VoiceRecorder onRecordingComplete={handleRecordingComplete} disabled={processing} />
+
+      {error && (
+        <Card className="p-4 border-red-200 bg-red-50">
+          <p className="text-sm text-red-700">{error}</p>
+        </Card>
+      )}
 
       {audioBlob && !result && (
         <Button 

@@ -35,9 +35,9 @@ export function DiagnosisHistory() {
     }
   };
 
-  const handleDownload = async (diagnosisId: number) => {
+  const handleDownload = async (diagnosis: DiagnosisItem) => {
     try {
-      await userAPI.downloadPDF(diagnosisId);
+      await userAPI.downloadPDF(diagnosis.id, diagnosis);
     } catch (error) {
       console.error('Download failed:', error);
       alert('Failed to download PDF');
@@ -134,9 +134,11 @@ export function DiagnosisHistory() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDownload(diagnosis.id)}
+                    onClick={() => handleDownload(diagnosis)}
+                    className="shrink-0"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-4 h-4 mr-2" />
+                    Report
                   </Button>
 
                   <Button
@@ -164,7 +166,7 @@ export function DiagnosisHistory() {
             <div className="space-y-4">
               <div>
                 <h4 className="font-semibold mb-1">Diagnosis</h4>
-                <p>{selectedDiagnosis.diagnosis}</p>
+                <p className="whitespace-pre-wrap wrap-break-word">{selectedDiagnosis.diagnosis}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -194,9 +196,9 @@ export function DiagnosisHistory() {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button onClick={() => handleDownload(selectedDiagnosis.id)}>
+                <Button onClick={() => handleDownload(selectedDiagnosis)}>
                   <Download className="w-4 h-4 mr-2" />
-                  Download PDF
+                  Download Report (PDF)
                 </Button>
               </div>
             </div>

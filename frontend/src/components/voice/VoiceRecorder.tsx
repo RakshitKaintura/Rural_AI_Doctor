@@ -2,12 +2,11 @@
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mic, Square, Pause, Play, Trash2, Send, Activity } from 'lucide-react';
+import { Mic, Square, Pause, Play, Trash2, Activity } from 'lucide-react';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from 'lib/utils';
 import WaveSurfer from 'wavesurfer.js';
-import RecordPlugin from 'wavesurfer.js/dist/plugins/record.esm.js';
 
 interface VoiceRecorderProps {
   onRecordingComplete: (audioBlob: Blob) => void;
@@ -32,7 +31,6 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
   // WaveSurfer Refs
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurfer = useRef<WaveSurfer | null>(null);
-  const recordPlugin = useRef<any>(null);
 
   // Initialize WaveSurfer
   useEffect(() => {
@@ -47,30 +45,24 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
         barRadius: 30,
         cursorWidth: 0,
       });
-
-      recordPlugin.current = wavesurfer.current.registerPlugin(RecordPlugin.create());
     }
     return () => wavesurfer.current?.destroy();
   }, []);
 
   // Sync WaveSurfer with Hook State
   const startRecording = () => {
-    recordPlugin.current?.startMic();
     startHookRecording();
   };
 
   const stopRecording = () => {
-    recordPlugin.current?.stopMic();
     stopHookRecording();
   };
 
   const pauseRecording = () => {
-    recordPlugin.current?.pauseRecording();
     pauseHookRecording();
   };
 
   const resumeRecording = () => {
-    recordPlugin.current?.resumeRecording();
     resumeHookRecording();
   };
 
@@ -179,17 +171,10 @@ export function VoiceRecorder({ onRecordingComplete, disabled }: VoiceRecorderPr
               <Button
                 onClick={clearRecording}
                 variant="outline"
-                className="flex-1 rounded-xl h-12 text-slate-600 border-slate-200 hover:bg-slate-50"
+                className="w-full rounded-xl h-12 text-slate-600 border-slate-200 hover:bg-slate-50"
               >
                 <Trash2 className="mr-2 w-4 h-4" />
                 Discard
-              </Button>
-              <Button
-                onClick={() => onRecordingComplete(audioBlob)}
-                className="flex-1 rounded-xl h-12 bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-100"
-              >
-                <Send className="mr-2 w-4 h-4" />
-                Submit Symptoms
               </Button>
             </div>
           </div>
