@@ -71,13 +71,17 @@ async def submit_audit_feedback(
     result = await db.execute(
         select(AIDecisionAudit).where(
             AIDecisionAudit.id == request.audit_id,
-            AIDecisionAudit.user_id == current_user.id,
+            or_(AIDecisionAudit.user_id == current_user.id, AIDecisionAudit.user_id.is_(None)),
         )
     )
     audit = result.scalar_one_or_none()
 
     if not audit:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit record not found")
+
+    if audit.user_id is None:
+        # Backfill ownership for older/system-generated audit rows
+        audit.user_id = current_user.id
 
     audit.override_applied = request.override_applied
     audit.override_reason = request.override_reason
