@@ -12,8 +12,9 @@ from app.services.llm.prompts import (
     SYMPTOM_ANALYSIS_PROMPT,
     TRIAGE_PROMPT
 )
+from app.core.config import settings
 from app.db.session import get_db
-from app.db.models import ChatHistory
+from app.db.models import ChatHistory, AIDecisionAudit
 from datetime import datetime
 import uuid
 
@@ -58,6 +59,19 @@ async def chat(
             content=response_text
         )
         db.add(assistant_msg)
+
+        audit_record = AIDecisionAudit(
+            session_id=session_id,
+            source_endpoint="/api/v1/chat/chat",
+            decision_type="chat",
+            input_summary=messages[-1]["content"],  # type: ignore
+            output_summary=response_text[:2000],
+            confidence_band="medium",
+            model_name=settings.GEMINI_MODEL,
+            model_version="v1",
+            prompt_version="medical-system-v1",
+        )
+        db.add(audit_record)
         await db.commit()
         
         return ChatResponse(
@@ -71,7 +85,7 @@ async def chat(
 
 
 @router.post("/analyze-symptoms", response_model=SymptomAnalysisResponse)
-async def analyze_symptoms(request: SymptomAnalysisRequest):
+async def analyze_symptoms(request: SymptomAnalysisRequest, db: AsyncSession = Depends(get_db)):
     """
     Analyze symptoms and provide preliminary assessment
     """
@@ -95,6 +109,20 @@ async def analyze_symptoms(request: SymptomAnalysisRequest):
         
       
         conditions = ["Condition analysis in progress"]
+
+        audit_record = AIDecisionAudit(
+            source_endpoint="/api/v1/chat/analyze-symptoms",
+            decision_type="symptom_analysis",
+            input_summary=request.symptoms,
+            output_summary=analysis[:2000] if isinstance(analysis, str) else str(analysis)[:2000],
+            confidence_band="medium",
+            urgency_level=severity.lower(),
+            model_name=settings.GEMINI_MODEL,
+            model_version="v1",
+            prompt_version="symptom-analysis-v1",
+        )
+        db.add(audit_record)
+        await db.commit()
         
         return SymptomAnalysisResponse(
             analysis=analysis,

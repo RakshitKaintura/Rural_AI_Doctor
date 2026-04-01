@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -32,6 +32,7 @@ from app.core.security import (
 )
 from app.core.deps import CurrentUser, get_current_active_user
 from app.core.config import settings
+from app.services.email.email_service import email_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ logger = logging.getLogger(__name__)
 DBDep = Annotated[AsyncSession, Depends(get_db)]
 
 @router.post("/register", response_model=UserInDB, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: DBDep) -> Any:
+async def register(user_data: UserCreate, db: DBDep, background_tasks: BackgroundTasks) -> Any:
     """Register a new patient account using async SQLAlchemy 2.0."""
     # Check for existing user using modern select()
     result = await db.execute(select(User).where(User.email == user_data.email))
@@ -62,6 +63,13 @@ async def register(user_data: UserCreate, db: DBDep) -> Any:
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    # Send welcome notification without delaying API response.
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        user.email,
+        user.full_name or user.email,
+    )
     
     logger.info(f"Account created: {user.email}")
     return user
@@ -141,14 +149,18 @@ async def change_password(
 
 
 @router.post("/forgot-password")
-async def forgot_password(password_reset: PasswordReset, db: DBDep) -> Any:
+async def forgot_password(password_reset: PasswordReset, db: DBDep, background_tasks: BackgroundTasks) -> Any:
     """Initiate the password recovery process."""
     result = await db.execute(select(User).where(User.email == password_reset.email))
     user = result.scalar_one_or_none()
     
     if user:
         reset_token = create_password_reset_token(user.email)
-        # Background task for email sending would go here
+        background_tasks.add_task(
+            email_service.send_password_reset_email,
+            user.email,
+            reset_token,
+        )
         logger.info(f"Recovery token generated for: {user.email}")
     
     # Always return a success message to prevent account enumeration

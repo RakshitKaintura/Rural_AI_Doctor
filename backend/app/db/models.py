@@ -168,3 +168,96 @@ class UsageMetrics(Base):
     value = Column(Integer)
     metadata_json = Column("metadata", JSON)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class TriageAssessment(Base):
+    __tablename__ = "triage_assessments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
+    symptoms_text = Column(Text, nullable=False)
+    age = Column(Integer, nullable=True)
+    vitals_json = Column("vitals", JSON, nullable=True)
+    risk_factors_json = Column("risk_factors", JSON, nullable=True)
+    urgency_level = Column(String, nullable=False)  # emergency, urgent, routine
+    red_flags_json = Column("red_flags", JSON, nullable=True)
+    rationale = Column(Text, nullable=True)
+    recommended_action = Column(Text, nullable=False)
+    escalated = Column(Boolean, default=False)
+    escalation_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class FollowUpPlan(Base):
+    __tablename__ = "followup_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
+    diagnosis_id = Column(Integer, ForeignKey("diagnoses.id"), nullable=True)
+    due_at = Column(DateTime(timezone=True), nullable=False)
+    channel = Column(String, default="sms")  # sms, call, whatsapp, in_app
+    reminder_enabled = Column(Boolean, default=True)
+    reminder_sent = Column(Boolean, default=False)
+    status = Column(String, default="scheduled")  # scheduled, completed, missed, cancelled
+    notes = Column(Text, nullable=True)
+    outcome = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class MedicationSafetyCheck(Base):
+    __tablename__ = "medication_safety_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
+    medications_json = Column("medications", JSON, nullable=False)
+    allergies_json = Column("allergies", JSON, nullable=True)
+    conditions_json = Column("conditions", JSON, nullable=True)
+    risk_level = Column(String, nullable=False)  # low, moderate, high, critical
+    interactions_json = Column("interactions", JSON, nullable=True)
+    contraindications_json = Column("contraindications", JSON, nullable=True)
+    recommendation = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SyncEvent(Base):
+    __tablename__ = "sync_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    device_id = Column(String, nullable=False, index=True)
+    entity_type = Column(String, nullable=False)  # diagnosis, followup, triage, note
+    entity_id = Column(String, nullable=False)
+    operation = Column(String, nullable=False)  # create, update, delete
+    payload_json = Column("payload", JSON, nullable=True)
+    client_updated_at = Column(DateTime(timezone=True), nullable=False)
+    server_updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    sync_status = Column(String, default="applied")  # applied, conflict, resolved
+    conflict_reason = Column(Text, nullable=True)
+    resolution_strategy = Column(String, nullable=True)  # client_wins, server_wins, merge
+    resolved_by_user = Column(Boolean, default=False)
+
+
+class AIDecisionAudit(Base):
+    __tablename__ = "ai_decision_audits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    session_id = Column(String, index=True, nullable=True)
+    source_endpoint = Column(String, nullable=False)
+    decision_type = Column(String, nullable=False)  # chat, triage, medication
+    input_summary = Column(Text, nullable=True)
+    output_summary = Column(Text, nullable=True)
+    confidence_band = Column(String, nullable=True)  # low, medium, high
+    urgency_level = Column(String, nullable=True)
+    red_flags_json = Column("red_flags", JSON, nullable=True)
+    model_name = Column(String, nullable=False)
+    model_version = Column(String, nullable=True)
+    prompt_version = Column(String, nullable=True)
+    override_applied = Column(Boolean, default=False)
+    override_reason = Column(Text, nullable=True)
+    clinician_feedback = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

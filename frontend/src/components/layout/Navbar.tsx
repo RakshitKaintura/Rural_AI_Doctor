@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { User, LogOut, Settings, History } from 'lucide-react';
+import { User, LogOut, Settings, History, CalendarClock, Download, FlaskConical } from 'lucide-react';
 import Link from 'next/link';
 
 export function Navbar() {
@@ -49,6 +49,24 @@ export function Navbar() {
                     <Link href="/history" className="flex items-center cursor-pointer">
                       <History className="w-4 h-4 mr-2" />
                       History
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/appointments" className="flex items-center cursor-pointer">
+                      <CalendarClock className="w-4 h-4 mr-2" />
+                      Appointments
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/export" className="flex items-center cursor-pointer">
+                      <Download className="w-4 h-4 mr-2" />
+                      Export Data
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/clinical-ops" className="flex items-center cursor-pointer">
+                      <FlaskConical className="w-4 h-4 mr-2" />
+                      Clinical Ops
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={logout} className="cursor-pointer">

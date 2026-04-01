@@ -3,10 +3,10 @@ User management and dashboard analytics endpoints.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, desc, select, delete
+from sqlalchemy import func, desc, select, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -37,16 +37,11 @@ def _normalize_severity(value: str | None) -> str:
 
 @router.get("/dashboard", response_model=UserDashboard)
 async def get_user_dashboard(current_user: ActiveUser, db: DBDep):
-    """
-    Retrieves aggregate statistics for the user dashboard using 
-    optimized SQLAlchemy 2.0 scalar execution.
-    """
-    # Total counts using async execution
+    """Retrieves aggregate statistics for the user dashboard."""
     total_diagnoses = await db.scalar(
         select(func.count(Diagnosis.id)).where(Diagnosis.user_id == current_user.id)
     )
     
-    # Efficiently fetch top 5 recent records
     recent_query = (
         select(Diagnosis)
         .where(Diagnosis.user_id == current_user.id)
@@ -58,7 +53,6 @@ async def get_user_dashboard(current_user: ActiveUser, db: DBDep):
     for diagnosis in recent_diagnoses:
         diagnosis.severity = _normalize_severity(diagnosis.severity)
     
-    # Interaction metrics
     total_chat_sessions = await db.scalar(
         select(func.count(func.distinct(ChatHistory.session_id)))
         .where(ChatHistory.user_id == current_user.id)
@@ -72,7 +66,6 @@ async def get_user_dashboard(current_user: ActiveUser, db: DBDep):
         select(func.count(ImageAnalysis.id)).where(ImageAnalysis.user_id == current_user.id)
     )
     
-    # Get last activity timestamp
     last_act_query = (
         select(Diagnosis.created_at)
         .where(Diagnosis.user_id == current_user.id)
@@ -82,7 +75,7 @@ async def get_user_dashboard(current_user: ActiveUser, db: DBDep):
     
     return UserDashboard(
         total_diagnoses=total_diagnoses or 0,
-        recent_diagnoses=list(recent_diagnoses),
+        recent_diagnoses=recent_diagnoses,
         total_chat_sessions=total_chat_sessions or 0,
         total_voice_interactions=total_voice or 0,
         total_image_analyses=total_images or 0,
@@ -110,11 +103,58 @@ async def get_diagnosis_history(
         diagnosis.severity = _normalize_severity(diagnosis.severity)
     return diagnoses
 
+@router.get("/history/diagnoses/search", response_model=list[DiagnosisHistory])
+async def search_diagnosis_history(
+    db: DBDep,
+    current_user: ActiveUser,
+    query: Optional[str] = None,
+    severity: Optional[str] = None,
+    urgency: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    skip: int = 0,
+    limit: int = 10,
+):
+    """
+    Advanced search and filtering for medical history.
+    Uses ILIKE for case-insensitive symptom and diagnosis matching.
+    """
+    stmt = select(Diagnosis).where(Diagnosis.user_id == current_user.id)
+    
+    if query:
+        stmt = stmt.where(
+            or_(
+                Diagnosis.diagnosis.ilike(f"%{query}%"),
+                Diagnosis.symptoms.ilike(f"%{query}%")
+            )
+        )
+    
+    if severity:
+        stmt = stmt.where(Diagnosis.severity == severity)
+        
+    if urgency:
+        stmt = stmt.where(Diagnosis.urgency_level == urgency)
+        
+    if date_from:
+        stmt = stmt.where(Diagnosis.created_at >= date_from)
+        
+    if date_to:
+        stmt = stmt.where(Diagnosis.created_at <= date_to)
+        
+    # Execute with ordering and pagination
+    stmt = stmt.order_by(desc(Diagnosis.created_at)).offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    diagnoses = list(result.scalars().all())
+    
+    # Ensure UI consistency through normalization
+    for diagnosis in diagnoses:
+        diagnosis.severity = _normalize_severity(diagnosis.severity)
+        
+    return diagnoses
+
 @router.get("/stats", response_model=UserStats)
 async def get_user_stats(current_user: ActiveUser, db: DBDep):
     """Calculates distribution analytics for medical insights."""
-    
-    # Severity breakdown
     sev_query = (
         select(Diagnosis.severity, func.count(Diagnosis.id))
         .where(Diagnosis.user_id == current_user.id)
@@ -126,10 +166,7 @@ async def get_user_stats(current_user: ActiveUser, db: DBDep):
         key = _normalize_severity(sev)
         diagnoses_by_severity[key] = diagnoses_by_severity.get(key, 0) + count
     
-    # Time-series analysis (Last 6 Months)
-    # Using timezone-aware UTC (2026 standard)
     six_months_ago = datetime.now(timezone.utc) - timedelta(days=180)
-    
     monthly_query = (
         select(
             func.date_trunc('month', Diagnosis.created_at).label('month'),
@@ -143,7 +180,6 @@ async def get_user_stats(current_user: ActiveUser, db: DBDep):
         month.strftime('%Y-%m'): count for month, count in monthly_result.all()
     }
     
-    # Mock data for demonstration - in production, this would use NLP symptom extraction
     most_common_symptoms = [
         {"symptom": "Fever", "count": 5},
         {"symptom": "Cough", "count": 3}
@@ -158,7 +194,6 @@ async def get_user_stats(current_user: ActiveUser, db: DBDep):
 @router.delete("/history/diagnosis/{diagnosis_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_diagnosis(diagnosis_id: int, current_user: ActiveUser, db: DBDep):
     """Secure deletion of specific medical records."""
-    # Atomic delete with ownership check
     stmt = (
         delete(Diagnosis)
         .where(Diagnosis.id == diagnosis_id, Diagnosis.user_id == current_user.id)
@@ -171,5 +206,4 @@ async def delete_diagnosis(diagnosis_id: int, current_user: ActiveUser, db: DBDe
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Medical record not found or unauthorized"
         )
-    
     return None

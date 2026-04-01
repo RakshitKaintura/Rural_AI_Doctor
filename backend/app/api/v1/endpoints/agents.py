@@ -5,10 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.db.session import get_db
-from app.db.models import ImageAnalysis
+from app.db.models import ImageAnalysis, Diagnosis, Patient, User
 from app.schemas.agents import DiagnosisRequest, DiagnosisResponse
 from app.services.agents.graph import get_medical_agent_graph
 from app.services.agents.state import AgentState
+from app.core.deps import get_current_active_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -22,7 +23,8 @@ router = APIRouter()
 )
 async def multi_agent_diagnosis(
     request: DiagnosisRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
   
     try:
@@ -85,6 +87,57 @@ async def multi_agent_diagnosis(
                     workflow_steps.append(msg.get('content', ''))
 
         logger.info("✅ Medical workflow completed successfully.")
+
+        # Resolve patient record so diagnosis can be persisted and reflected on dashboard/history.
+        patient_record: Patient | None = None
+        if request.patient_id:
+            patient_result = await db.execute(
+                select(Patient).where(
+                    Patient.id == request.patient_id,
+                    Patient.user_id == current_user.id,
+                )
+            )
+            patient_record = patient_result.scalar_one_or_none()
+
+        if patient_record is None:
+            latest_patient_result = await db.execute(
+                select(Patient)
+                .where(Patient.user_id == current_user.id)
+                .order_by(Patient.id.desc())
+                .limit(1)
+            )
+            patient_record = latest_patient_result.scalar_one_or_none()
+
+        if patient_record is None:
+            patient_record = Patient(
+                user_id=current_user.id,
+                name=current_user.full_name or current_user.email,
+                age=request.age,
+                gender=request.gender,
+            )
+            db.add(patient_record)
+            await db.flush()
+
+        urgency = final_state.get('urgency_level', 'ROUTINE')
+        severity_map = {
+            'EMERGENCY': 'Critical',
+            'URGENT': 'High',
+            'ROUTINE': 'Low',
+            'SELF-CARE': 'Low',
+        }
+        diagnosis_row = Diagnosis(
+            user_id=current_user.id,
+            patient_id=patient_record.id,
+            symptoms=request.symptoms,
+            diagnosis=diagnosis_info.get('primary_diagnosis', 'Unable to determine'),
+            confidence=float(final_state.get('confidence', 0.0) or 0.0),
+            severity=severity_map.get(urgency, 'Low'),
+            treatment_plan=treatment_info,
+            full_report=final_state.get('final_report', 'Report generation failed.'),
+            urgency_level=urgency,
+        )
+        db.add(diagnosis_row)
+        await db.commit()
 
         return DiagnosisResponse(
             diagnosis=diagnosis_info.get('primary_diagnosis', 'Unable to determine'),

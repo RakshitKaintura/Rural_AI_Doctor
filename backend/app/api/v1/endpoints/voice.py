@@ -10,9 +10,10 @@ from typing import Optional, List
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from fastapi.responses import StreamingResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.session import get_db
-from app.db.models import VoiceInteraction
+from app.db.models import VoiceInteraction, Diagnosis, Patient, User
 from app.schemas.voice import (
     TranscriptionResponse,
     TTSRequest,
@@ -20,6 +21,7 @@ from app.schemas.voice import (
 )
 from app.services.voice.audio_utils import audio_utils
 from app.services.agents.state import AgentState
+from app.core.deps import get_current_active_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -103,7 +105,8 @@ async def voice_diagnosis(
     age: int = Form(...),
     gender: str = Form(...),
     medical_history: Optional[str] = Form(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     from app.services.voice.service import voice_service
     from app.services.agents.graph import get_medical_agent_graph
@@ -125,9 +128,50 @@ async def voice_diagnosis(
         
         graph = get_medical_agent_graph()
         final_state = await graph.ainvoke(initial_state)
+
+        # Resolve/create patient so diagnosis rows remain relationally valid.
+        patient_result = await db.execute(
+            select(Patient)
+            .where(Patient.user_id == current_user.id)
+            .order_by(Patient.id.desc())
+            .limit(1)
+        )
+        patient_record = patient_result.scalar_one_or_none()
+
+        if patient_record is None:
+            patient_record = Patient(
+                user_id=current_user.id,
+                name=current_user.full_name or current_user.email,
+                age=age,
+                gender=gender,
+            )
+            db.add(patient_record)
+            await db.flush()
+
+        urgency = final_state.get('urgency_level', 'ROUTINE')
+        severity_map = {
+            'EMERGENCY': 'Critical',
+            'URGENT': 'High',
+            'ROUTINE': 'Low',
+            'SELF-CARE': 'Low',
+        }
+        diagnosis_name = final_state.get('diagnosis', {}).get('primary_diagnosis', 'a health concern')
+        diagnosis_row = Diagnosis(
+            user_id=current_user.id,
+            patient_id=patient_record.id,
+            symptoms=symptoms_text,
+            diagnosis=diagnosis_name,
+            confidence=float(final_state.get('confidence', 0.0) or 0.0),
+            severity=severity_map.get(urgency, 'Low'),
+            treatment_plan=final_state.get('treatment_plan', {}),
+            full_report=final_state.get('final_report', ''),
+            urgency_level=urgency,
+        )
+        db.add(diagnosis_row)
+        await db.commit()
         
         # Formulate Speech Summary
-        diag_name = final_state.get('diagnosis', {}).get('primary_diagnosis', 'a health concern')
+        diag_name = diagnosis_name
         summary = f"Based on your report, I've identified {diag_name}."
         
         if final_state.get('urgency_level') == 'EMERGENCY':

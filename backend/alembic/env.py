@@ -16,13 +16,7 @@ from app.db.base import Base
 # If these aren't imported here, Alembic will try to DELETE these tables.
 # Ensure these import paths match your actual file structure.
 try:
-    from app.db.models import (
-        Patient, 
-        ChatHistory, 
-        Diagnosis, 
-        VoiceInteraction, 
-        MedicalDocument
-    )
+    from app.db.models import *  # noqa: F401,F403
 except ImportError as e:
     print(f"Import Warning: {e}. Check your model paths in alembic/env.py")
 
