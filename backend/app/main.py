@@ -143,7 +143,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_origin_regex=r"^https://rural-ai-doctor.*\.vercel\.app$",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
     expose_headers=["X-Process-Time-MS"],
     max_age=3600, 
