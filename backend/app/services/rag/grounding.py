@@ -4,7 +4,7 @@ import asyncio
 from typing import Any
 
 import google.generativeai as genai
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, text
 
 from app.core.config import settings
 from app.db.models import MedicalDocument
@@ -38,6 +38,20 @@ async def _embed_query(query: str) -> list[float] | None:
         return None
 
 
+async def _metadata_column_exists(db: Any) -> bool:
+        exists_stmt = text(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = 'medical_documents'
+                    AND column_name = 'metadata'
+                LIMIT 1
+                """
+        )
+        result = await db.execute(exists_stmt)
+        return result.scalar_one_or_none() == 1
+
+
 async def retrieve_medical_grounding(query: str, top_k: int = 3) -> list[dict[str, Any]]:
     """Return grounded source citations from MedicalDocument with vector-first retrieval.
 
@@ -48,14 +62,21 @@ async def retrieve_medical_grounding(query: str, top_k: int = 3) -> list[dict[st
 
     async with AsyncSessionLocal() as db:
         rows = []
+        has_metadata_column = await _metadata_column_exists(db)
+
+        select_columns = [
+            MedicalDocument.id,
+            MedicalDocument.title,
+            MedicalDocument.content,
+        ]
+        if has_metadata_column:
+            select_columns.append(MedicalDocument.metadata_json)
+
         if embedding:
             try:
                 vector_stmt = (
                     select(
-                        MedicalDocument.id,
-                        MedicalDocument.title,
-                        MedicalDocument.content,
-                        MedicalDocument.metadata_json,
+                        *select_columns,
                         (1 - MedicalDocument.embedding.cosine_distance(embedding)).label("similarity"),
                     )
                     .where(MedicalDocument.embedding.is_not(None))
@@ -69,12 +90,7 @@ async def retrieve_medical_grounding(query: str, top_k: int = 3) -> list[dict[st
 
         if not rows:
             lexical_stmt = (
-                select(
-                    MedicalDocument.id,
-                    MedicalDocument.title,
-                    MedicalDocument.content,
-                    MedicalDocument.metadata_json,
-                )
+                select(*select_columns)
                 .where(
                     or_(
                         MedicalDocument.title.ilike(f"%{query}%"),
@@ -87,7 +103,7 @@ async def retrieve_medical_grounding(query: str, top_k: int = 3) -> list[dict[st
             rows = list(lexical_result.all())
 
         for idx, row in enumerate(rows, start=1):
-            metadata = row.metadata_json if hasattr(row, "metadata_json") else None
+            metadata = row.metadata_json if has_metadata_column and hasattr(row, "metadata_json") else None
             source_ref = ""
             if isinstance(metadata, dict):
                 source_ref = str(metadata.get("source") or metadata.get("file") or "")

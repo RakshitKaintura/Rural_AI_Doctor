@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
 	export,
 	appointments,
 	backup,
+	rag,
 )
 
 api_router = APIRouter()
@@ -29,6 +30,7 @@ api_router.include_router(admin.router)
 api_router.include_router(export.router)
 api_router.include_router(appointments.router)
 api_router.include_router(backup.router)
+api_router.include_router(rag.router, prefix="/rag", tags=["rag"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(vision.router, prefix="/vision", tags=["vision"])
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])

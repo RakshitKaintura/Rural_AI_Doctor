@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { User, LogOut, Settings, History, CalendarClock, Download, FlaskConical } from 'lucide-react';
+import { User, LogOut, Settings, History, CalendarClock, Download, FlaskConical, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 
 export function Navbar() {
@@ -30,6 +30,10 @@ export function Navbar() {
 
               <Link href="/diagnosis">
                 <Button variant="ghost">New Diagnosis</Button>
+              </Link>
+
+              <Link href="/rag">
+                <Button variant="ghost">RAG</Button>
               </Link>
 
               <DropdownMenu>
@@ -67,6 +71,12 @@ export function Navbar() {
                     <Link href="/clinical-ops" className="flex items-center cursor-pointer">
                       <FlaskConical className="w-4 h-4 mr-2" />
                       Clinical Ops
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/rag" className="flex items-center cursor-pointer">
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      RAG Assistant
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={logout} className="cursor-pointer">
