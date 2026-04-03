@@ -14,6 +14,15 @@ export interface Medication {
   notes?: string;
 }
 
+export interface SourceCitation {
+  id: number;
+  rank: number;
+  title: string;
+  source?: string;
+  excerpt: string;
+  similarity: number;
+}
+
 export interface DiagnosisRequest {
   symptoms: string;
   age?: number;
@@ -47,6 +56,7 @@ export interface DiagnosisResponse {
   final_report: string;
   workflow_steps: string[];
   is_grounded_in_rag: boolean;
+  citations: SourceCitation[];
 }
 
 export const agentsAPI = {

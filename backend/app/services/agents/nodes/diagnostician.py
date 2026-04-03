@@ -2,6 +2,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from app.services.agents.state import AgentState
 from app.services.llm.gemini_client import gemini_client
+from app.services.rag.grounding import retrieve_medical_grounding
 
 class DiagnosisAssessment(BaseModel):
     """Structured schema for clinical diagnosis and reasoning."""
@@ -38,8 +39,16 @@ async def diagnostician_node(state: AgentState) -> AgentState:
         )
 
 
-    retrieved_docs = []
-    rag_text = "Knowledge base feature has been disabled for this deployment."
+    retrieved_docs = await retrieve_medical_grounding(raw_text, top_k=3)
+    if retrieved_docs:
+        rag_text = "\n\n".join(
+            [
+                f"[{doc['rank']}] {doc['title']}\nExcerpt: {doc['excerpt']}"
+                for doc in retrieved_docs
+            ]
+        )
+    else:
+        rag_text = "No matching medical source was found in the grounded knowledge base."
 
 
     system_prompt = f"""You are a senior clinical diagnostician. 

@@ -18,9 +18,48 @@ import {
 } from 'lucide-react';
 import { agentsAPI, DiagnosisResponse } from '@/lib/api/agents';
 
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length >= 5);
+}
+
+function getCitationRanks(text: string, citations: DiagnosisResponse['citations']): number[] {
+  if (!citations || citations.length === 0) {
+    return [];
+  }
+
+  const tokens = new Set(tokenize(text));
+  const scored = citations
+    .map((citation) => {
+      const sourceText = `${citation.title} ${citation.excerpt}`.toLowerCase();
+      let score = 0;
+      tokens.forEach((token) => {
+        if (sourceText.includes(token)) {
+          score += 1;
+        }
+      });
+      return { rank: citation.rank, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map((item) => item.rank);
+
+  if (scored.length > 0) {
+    return scored;
+  }
+
+  // Fallback to top source when no lexical overlap is detected.
+  return [citations[0].rank];
+}
+
 export function CompleteDiagnosis() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosisResponse | null>(null);
+  const [showSources, setShowSources] = useState(false);
 
   // Form state
   const [symptoms, setSymptoms] = useState('');
@@ -54,6 +93,7 @@ export function CompleteDiagnosis() {
       });
 
       setResult(response);
+      setShowSources(false);
     } catch (error: any) {
       console.error('Diagnosis error:', error);
       alert(error.response?.data?.detail || 'Diagnosis failed');
@@ -69,6 +109,23 @@ export function CompleteDiagnosis() {
       ROUTINE: 'bg-green-100 text-green-800 border-green-300',
     };
     return colors[urgency] || 'bg-gray-100 text-gray-800 border-gray-300';
+  };
+
+  const renderCitationAnchors = (text: string) => {
+    if (!result?.citations || result.citations.length === 0) {
+      return null;
+    }
+    const ranks = getCitationRanks(text, result.citations);
+    if (ranks.length === 0) {
+      return null;
+    }
+    return (
+      <span className="ml-1 text-[11px] font-semibold text-blue-700">
+        {ranks.map((rank) => (
+          <span key={rank} className="mr-1">[{rank}]</span>
+        ))}
+      </span>
+    );
   };
 
   return (
@@ -262,7 +319,31 @@ export function CompleteDiagnosis() {
           {/* Treatment Plan */}
           {result.treatment_plan && (
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Treatment Plan</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Treatment Plan</h3>
+                {result.citations && result.citations.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => setShowSources(!showSources)}>
+                    View Source
+                  </Button>
+                )}
+              </div>
+
+              {showSources && result.citations && result.citations.length > 0 && (
+                <div className="mb-4 p-4 border rounded-lg bg-amber-50/50 space-y-3">
+                  <p className="text-sm font-medium text-amber-800">Grounded Medical Sources</p>
+                  {result.citations.map((citation) => (
+                    <div key={citation.id} className="p-3 bg-white rounded border">
+                      <p className="text-sm font-semibold">
+                        [{citation.rank}] {citation.title}
+                      </p>
+                      {citation.source && (
+                        <p className="text-xs text-gray-500 mt-1">Source: {citation.source}</p>
+                      )}
+                      <p className="text-xs text-gray-700 mt-2">{citation.excerpt}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="space-y-4">
                 {/* Medications */}
@@ -272,7 +353,10 @@ export function CompleteDiagnosis() {
                     <div className="space-y-2">
                       {result.treatment_plan.medications.map((med, idx) => (
                         <div key={idx} className="p-3 bg-blue-50 rounded-lg">
-                          <p className="font-medium">{med.name}</p>
+                          <p className="font-medium">
+                            {med.name}
+                            {renderCitationAnchors(`${med.name} ${med.dosage} ${med.frequency} ${med.duration}`)}
+                          </p>
                           <p className="text-sm text-gray-600">
                             {med.dosage} - {med.frequency} for {med.duration}
                           </p>
@@ -288,7 +372,10 @@ export function CompleteDiagnosis() {
                     <h4 className="font-medium mb-2">🏥 General Care</h4>
                     <ul className="space-y-1">
                       {result.treatment_plan.non_pharmacological.map((item, idx) => (
-                        <li key={idx} className="text-sm">• {item}</li>
+                        <li key={idx} className="text-sm">
+                          • {item}
+                          {renderCitationAnchors(item)}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -304,6 +391,7 @@ export function CompleteDiagnosis() {
                       {result.treatment_plan.red_flags.map((flag, idx) => (
                         <li key={idx} className="text-sm text-red-800">
                           • {flag}
+                          {renderCitationAnchors(flag)}
                         </li>
                       ))}
                     </ul>

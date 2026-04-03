@@ -22,6 +22,15 @@ class TreatmentPlanSchema(BaseModel):
     red_flags: List[str]
     referral_needed: bool
 
+
+class SourceCitation(BaseModel):
+    id: int
+    rank: int
+    title: str
+    source: Optional[str] = None
+    excerpt: str
+    similarity: float = 0.0
+
 class DiagnosisRequest(BaseModel):
     
     symptoms: str = Field(..., min_length=5, description="Raw symptoms description from the patient")
@@ -60,6 +69,10 @@ class DiagnosisResponse(BaseModel):
     is_grounded_in_rag: bool = Field(
         default=False, 
         description="Whether clinical guidelines were retrieved from the local knowledge base"
+    )
+    citations: List[SourceCitation] = Field(
+        default_factory=list,
+        description="Grounded source citations used to support diagnosis and treatment advice"
     )
 
     model_config = ConfigDict(populate_by_name=True)

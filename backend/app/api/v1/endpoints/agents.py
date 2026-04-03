@@ -147,7 +147,8 @@ async def multi_agent_diagnosis(
             urgency_level=final_state.get('urgency_level', 'ROUTINE'),
             final_report=final_state.get('final_report', 'Report generation failed.'),
             workflow_steps=workflow_steps,
-            is_grounded_in_rag=bool(final_state.get('rag_context'))
+            is_grounded_in_rag=bool(final_state.get('rag_context')),
+            citations=final_state.get('rag_context') or []
         )
     
     except Exception as e:
