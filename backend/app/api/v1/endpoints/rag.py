@@ -7,7 +7,7 @@ from typing import Any, List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pypdf import PdfReader
-from sqlalchemy import select
+from sqlalchemy import String, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -207,7 +207,9 @@ async def query_uploaded_reports(
         MedicalDocument.title,
         MedicalDocument.content,
         MedicalDocument.metadata_json,
-    ).where(MedicalDocument.metadata_json["uploader_user_id"].astext == str(current_user.id))
+    ).where(
+        cast(MedicalDocument.metadata_json["uploader_user_id"], String) == str(current_user.id)
+    )
 
     result = await db.execute(stmt)
     rows = list(result.all())
