@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import google.generativeai as genai
 from sqlalchemy import or_, select, text
 
 from app.core.config import settings
@@ -23,6 +22,10 @@ async def _embed_query(query: str) -> list[float] | None:
         return None
 
     def _call_embed() -> list[float] | None:
+        try:
+            import google.generativeai as genai
+        except Exception:
+            return None
         genai.configure(api_key=settings.GOOGLE_API_KEY)
         result = genai.embed_content(
             model=settings.EMBEDDING_MODEL,

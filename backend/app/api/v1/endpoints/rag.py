@@ -4,7 +4,6 @@ import re
 import uuid
 from typing import Any, List
 
-import google.generativeai as genai
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pypdf import PdfReader
 from sqlalchemy import select
@@ -70,6 +69,10 @@ async def _embed_text(text: str) -> list[float]:
         return FALLBACK_EMBEDDING
 
     def _call_embed() -> list[float]:
+        try:
+            import google.generativeai as genai
+        except Exception:
+            return FALLBACK_EMBEDDING
         genai.configure(api_key=settings.GOOGLE_API_KEY)
         result = genai.embed_content(
             model=settings.EMBEDDING_MODEL,
