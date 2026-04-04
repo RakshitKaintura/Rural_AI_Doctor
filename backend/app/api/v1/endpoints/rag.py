@@ -16,12 +16,14 @@ from app.db.models import MedicalDocument, User
 from app.db.session import get_db
 from app.schemas.rag import RagCitation, RagQueryRequest, RagQueryResponse, RagUploadResponse
 from app.services.llm.gemini_client import gemini_client
+from app.services.rag.reputable_sources import retrieve_reputable_citations
 
 
 router = APIRouter()
 
 MAX_UPLOAD_BYTES = 40 * 1024 * 1024
 FALLBACK_EMBEDDING = [0.0] * 768
+LOCAL_RELEVANCE_THRESHOLD = 0.2
 
 
 def _chunk_text(text: str, chunk_size: int = 2500, overlap: int = 250) -> List[str]:
@@ -78,6 +80,28 @@ def _score_chunk(question: str, content: str) -> float:
     overlap = len(q_terms & c_terms)
     phrase_bonus = 1.0 if question.lower() in content.lower() else 0.0
     return (overlap / len(q_terms)) + phrase_bonus
+
+
+def _provider_weight(provider: str) -> float:
+    weights = {
+        "LocalRAG": 1.0,
+        "PubMed": 0.95,
+        "OpenFDA": 0.9,
+        "MedlinePlus": 0.85,
+        "ClinicalTrials": 0.8,
+    }
+    return weights.get(provider, 0.75)
+
+
+def _rank_citation_dicts(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranked = sorted(
+        citations,
+        key=lambda c: float(c.get("similarity", 0.0) or 0.0) * _provider_weight(str(c.get("provider") or "")),
+        reverse=True,
+    )
+    for idx, citation in enumerate(ranked, start=1):
+        citation["rank"] = idx
+    return ranked
 
 
 async def _embed_text(text: str) -> list[float]:
@@ -214,47 +238,92 @@ async def query_uploaded_reports(
     result = await db.execute(stmt)
     rows = list(result.all())
 
-    if not rows:
-        raise HTTPException(status_code=404, detail="No uploaded report data found. Upload a PDF, TXT, MD, or CSV file first.")
+    local_citation_dicts: list[dict[str, Any]] = []
+    if rows:
+        scored_rows: list[tuple[Any, float]] = [
+            (row, _score_chunk(request.question, row.content or "")) for row in rows
+        ]
+        scored_rows.sort(key=lambda item: item[1], reverse=True)
 
-    ranked = sorted(
-        rows,
-        key=lambda row: _score_chunk(request.question, row.content or ""),
-        reverse=True,
-    )
+        relevant_rows = [pair for pair in scored_rows if pair[1] >= LOCAL_RELEVANCE_THRESHOLD]
+        selected_rows = relevant_rows[: request.top_k]
 
-    top_rows = [row for row in ranked if _score_chunk(request.question, row.content or "") > 0][: request.top_k]
-    if not top_rows:
-        top_rows = ranked[: request.top_k]
+        for row, score in selected_rows:
+            metadata: Any = row.metadata_json if hasattr(row, "metadata_json") else {}
+            source = ""
+            if isinstance(metadata, dict):
+                source = str(metadata.get("source") or "")
+
+            local_citation_dicts.append(
+                {
+                    "id": int(row.id),
+                    "rank": 0,
+                    "provider": "LocalRAG",
+                    "title": row.title or "Uploaded Report Chunk",
+                    "source": source,
+                    "excerpt": (row.content or "")[:700],
+                    "similarity": float(score),
+                    "content": row.content or "",
+                }
+            )
+
+    reputable_citation_dicts: list[dict[str, Any]] = []
+    try:
+        reputable_citation_dicts = await retrieve_reputable_citations(
+            request.question,
+            top_k=min(3, request.top_k),
+        )
+    except Exception:
+        reputable_citation_dicts = []
+
+    merged_ranked = _rank_citation_dicts([*local_citation_dicts, *reputable_citation_dicts])[: request.top_k]
 
     citations: list[RagCitation] = []
     context_blocks: list[str] = []
-    for rank, row in enumerate(top_rows, start=1):
-        metadata: Any = row.metadata_json if hasattr(row, "metadata_json") else {}
-        source = ""
-        if isinstance(metadata, dict):
-            source = str(metadata.get("source") or "")
+    has_local_context = False
 
-        excerpt = (row.content or "")[:700]
+    for citation in merged_ranked:
+        rank = int(citation.get("rank", 0) or 0)
+        citation_id = int(citation.get("id", rank) or rank)
+        title = str(citation.get("title") or f"Source {rank}")
+        source = str(citation.get("source") or "")
+        excerpt = str(citation.get("excerpt") or "")
+        provider = str(citation.get("provider") or "")
+
         citations.append(
             RagCitation(
-                id=int(row.id),
+                id=citation_id,
                 rank=rank,
-                title=row.title or f"Chunk {rank}",
+                title=title,
                 source=source,
                 excerpt=excerpt,
             )
         )
-        context_blocks.append(f"[{rank}] {row.title}\n{row.content}")
+
+        if provider == "LocalRAG":
+            has_local_context = True
+            content = str(citation.get("content") or excerpt)
+            context_blocks.append(f"[{rank}] {title}\n{content}")
+        else:
+            context_blocks.append(f"[{rank}] {title}\n{excerpt}")
 
     context_text = "\n\n".join(context_blocks)
-    prompt = (
-        "You are a medical report assistant. Answer ONLY from the provided context. "
-        "If the context is insufficient, clearly say what is missing. "
-        "Add citation markers like [1], [2] matching the context blocks.\n\n"
-        f"Question:\n{request.question}\n\n"
-        f"Context:\n{context_text}"
-    )
+
+    if context_blocks:
+        prompt = (
+            "You are a medical assistant. Use provided context first. "
+            "If context is incomplete, then use reliable general medical knowledge and say that part is general guidance. "
+            "Use citations like [1], [2] only for claims supported by the provided context blocks.\n\n"
+            f"Question:\n{request.question}\n\n"
+            f"Context:\n{context_text}"
+        )
+    else:
+        prompt = (
+            "You are a medical assistant. No relevant uploaded context is available. "
+            "Answer from general medical knowledge in a clear, practical way with safety caveats. "
+            "If urgent warning signs exist, advise immediate care.\n\n"
+            f"Question:\n{request.question}"
+        )
 
     try:
         answer = await gemini_client.generate(prompt)
@@ -264,8 +333,7 @@ async def query_uploaded_reports(
             "Based on your uploaded report, please review the cited excerpts."
         )
 
-    return RagQueryResponse(
-        answer=str(answer),
-        matched_chunks=len(citations),
-        citations=citations,
-    )
+    if not has_local_context and not citations:
+        citations = []
+
+    return RagQueryResponse(answer=str(answer), matched_chunks=len(citations), citations=citations)

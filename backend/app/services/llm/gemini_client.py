@@ -1,7 +1,7 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.core.config import settings
-from typing import List, Dict, Type, TypeVar, Optional
+from typing import Any, List, Dict, Type, TypeVar, Optional
 import os
 
 T = TypeVar("T")
@@ -26,6 +26,36 @@ class GeminiClient:
             max_retries=2,
         )
         return self.llm
+
+    def _normalize_content(self, content: Any) -> str:
+        """Normalize multimodal/structured model payloads into plain text."""
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, dict):
+            text = content.get("text")
+            if isinstance(text, str) and text.strip():
+                return text
+            parts = content.get("parts")
+            if isinstance(parts, list):
+                normalized = "\n".join(
+                    self._normalize_content(part) for part in parts if self._normalize_content(part).strip()
+                )
+                if normalized.strip():
+                    return normalized
+            return str(content)
+
+        if isinstance(content, list):
+            normalized_parts: list[str] = []
+            for part in content:
+                normalized = self._normalize_content(part)
+                if normalized.strip():
+                    normalized_parts.append(normalized)
+            if normalized_parts:
+                return "\n".join(normalized_parts)
+            return ""
+
+        return str(content)
     
     async def chat(
         self,
@@ -47,13 +77,13 @@ class GeminiClient:
                 lc_messages.append(AIMessage(content=content))
         
         response = await llm.ainvoke(lc_messages)
-        return response.content
+        return self._normalize_content(response.content)
     
     async def generate(self, prompt: str) -> str:
         """Standard text generation."""
         llm = self._get_llm()
         response = await llm.ainvoke([HumanMessage(content=prompt)])
-        return response.content
+        return self._normalize_content(response.content)
 
     async def generate_structured(self, prompt: str, response_model: Type[T]) -> T:
         """
