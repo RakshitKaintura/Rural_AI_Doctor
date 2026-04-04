@@ -67,6 +67,10 @@ class Settings(BaseSettings):
             # PgBouncer compatibility: disable prepared statement cache.
             parsed = urlparse(v)
             query_params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            # asyncpg expects `ssl`, not `sslmode`.
+            if "sslmode" in query_params and "ssl" not in query_params:
+                query_params["ssl"] = query_params["sslmode"]
+            query_params.pop("sslmode", None)
             query_params.setdefault("prepared_statement_cache_size", "0")
             v = urlunparse(parsed._replace(query=urlencode(query_params)))
         return v
