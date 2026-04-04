@@ -21,6 +21,44 @@ export function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const getErrorMessage = (err: unknown): string => {
+    if (typeof err === 'string') {
+      return err;
+    }
+
+    if (err && typeof err === 'object') {
+      const maybeAxiosError = err as {
+        response?: {
+          data?: {
+            detail?: string | string[];
+            error?: { message?: string };
+          };
+        };
+        message?: string;
+      };
+      const detail = maybeAxiosError.response?.data?.detail;
+      const wrappedMessage = maybeAxiosError.response?.data?.error?.message;
+
+      if (typeof detail === 'string' && detail.trim().length > 0) {
+        return detail;
+      }
+
+      if (Array.isArray(detail) && detail.length > 0) {
+        return detail.join(', ');
+      }
+
+      if (typeof wrappedMessage === 'string' && wrappedMessage.trim().length > 0) {
+        return wrappedMessage;
+      }
+
+      if (typeof maybeAxiosError.message === 'string' && maybeAxiosError.message.trim().length > 0) {
+        return maybeAxiosError.message;
+      }
+    }
+
+    return 'Registration failed';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -45,8 +83,8 @@ export function RegisterForm() {
         full_name: formData.full_name,
       });
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Registration failed');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

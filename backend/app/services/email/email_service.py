@@ -125,15 +125,14 @@ class EmailService:
         attachments: list[dict[str, Any]] = None
     ) -> None:
         """Internal helper to manage FastMail execution and logging."""
-        message = MessageSchema(
-            subject=subject,
-            recipients=recipients,
-            body=body,
-            subtype=MessageType.html,
-            attachments=attachments
-        )
-        
         try:
+            message = MessageSchema(
+                subject=subject,
+                recipients=recipients,
+                body=body,
+                subtype=MessageType.html,
+                attachments=attachments or []
+            )
             await self.fast_mail.send_message(message)
             logger.info(f"Successfully dispatched '{subject}' to {recipients}")
         except Exception as e:
