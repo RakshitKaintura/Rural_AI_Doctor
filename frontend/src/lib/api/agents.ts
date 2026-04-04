@@ -18,6 +18,7 @@ export interface SourceCitation {
   id: number;
   rank: number;
   title: string;
+  provider?: string;
   source?: string;
   excerpt: string;
   similarity: number;

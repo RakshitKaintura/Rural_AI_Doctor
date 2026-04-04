@@ -27,6 +27,7 @@ class SourceCitation(BaseModel):
     id: int
     rank: int
     title: str
+    provider: Optional[str] = None
     source: Optional[str] = None
     excerpt: str
     similarity: float = 0.0

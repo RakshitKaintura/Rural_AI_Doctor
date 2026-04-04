@@ -117,6 +117,7 @@ async def retrieve_medical_grounding(query: str, top_k: int = 3) -> list[dict[st
                 {
                     "id": int(row.id),
                     "rank": idx,
+                    "provider": "LocalRAG",
                     "title": row.title or f"Medical Source #{idx}",
                     "source": source_ref,
                     "excerpt": excerpt,

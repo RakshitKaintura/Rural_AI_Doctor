@@ -1,4 +1,5 @@
 import asyncio
+import csv
 import io
 import re
 import uuid
@@ -19,7 +20,7 @@ from app.services.llm.gemini_client import gemini_client
 
 router = APIRouter()
 
-MAX_PDF_UPLOAD_BYTES = 40 * 1024 * 1024
+MAX_UPLOAD_BYTES = 40 * 1024 * 1024
 FALLBACK_EMBEDDING = [0.0] * 768
 
 
@@ -48,6 +49,21 @@ def _extract_pdf_text(file_bytes: bytes) -> str:
         if page_text.strip():
             pages_text.append(page_text)
     return "\n\n".join(pages_text).strip()
+
+
+def _extract_txt_text(file_bytes: bytes) -> str:
+    return file_bytes.decode("utf-8", errors="ignore").strip()
+
+
+def _extract_csv_text(file_bytes: bytes) -> str:
+    decoded = file_bytes.decode("utf-8", errors="ignore")
+    reader = csv.reader(io.StringIO(decoded))
+    rows: list[str] = []
+    for row in reader:
+        cleaned_cells = [cell.strip() for cell in row if cell and cell.strip()]
+        if cleaned_cells:
+            rows.append(" | ".join(cleaned_cells))
+    return "\n".join(rows).strip()
 
 
 def _tokenize(text: str) -> set[str]:
@@ -94,7 +110,7 @@ async def _embed_text(text: str) -> list[float]:
     "/upload-pdf",
     response_model=RagUploadResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload PDF to personal RAG knowledge base",
+    summary="Upload PDF, TXT, MD, or CSV to personal RAG knowledge base",
 )
 async def upload_pdf_to_rag(
     file: UploadFile = File(...),
@@ -104,24 +120,35 @@ async def upload_pdf_to_rag(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing file name")
 
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    lower_name = file.filename.lower()
+    is_pdf = lower_name.endswith(".pdf")
+    is_txt = lower_name.endswith(".txt")
+    is_md = lower_name.endswith(".md")
+    is_csv = lower_name.endswith(".csv")
+    if not (is_pdf or is_txt or is_md or is_csv):
+        raise HTTPException(status_code=400, detail="Only PDF, TXT, MD, and CSV files are supported")
 
     file_bytes = await file.read()
     size_bytes = len(file_bytes)
-    if size_bytes > MAX_PDF_UPLOAD_BYTES:
+    if size_bytes > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="PDF exceeds 40MB size limit",
+            detail="File exceeds 40MB size limit",
         )
 
     try:
-        extracted_text = _extract_pdf_text(file_bytes)
+        if is_pdf:
+            extracted_text = _extract_pdf_text(file_bytes)
+        elif is_csv:
+            extracted_text = _extract_csv_text(file_bytes)
+        else:
+            extracted_text = _extract_txt_text(file_bytes)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {exc}") from exc
+        file_type = "PDF" if is_pdf else "CSV" if is_csv else "TEXT"
+        raise HTTPException(status_code=400, detail=f"Failed to read {file_type}: {exc}") from exc
 
     if not extracted_text:
-        raise HTTPException(status_code=400, detail="PDF contains no extractable text")
+        raise HTTPException(status_code=400, detail="File contains no extractable text")
 
     chunks = _chunk_text(extracted_text)
     if not chunks:
@@ -161,7 +188,7 @@ async def upload_pdf_to_rag(
         size_bytes=size_bytes,
         chunks_indexed=len(chunks),
         truncated=truncated,
-        message="PDF indexed successfully and ready for Q&A",
+        message="File indexed successfully and ready for Q&A",
     )
 
 
@@ -186,7 +213,7 @@ async def query_uploaded_reports(
     rows = list(result.all())
 
     if not rows:
-        raise HTTPException(status_code=404, detail="No uploaded report data found. Upload a PDF first.")
+        raise HTTPException(status_code=404, detail="No uploaded report data found. Upload a PDF, TXT, MD, or CSV file first.")
 
     ranked = sorted(
         rows,

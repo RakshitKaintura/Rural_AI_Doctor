@@ -3,6 +3,30 @@ from pydantic import BaseModel, Field
 from app.services.agents.state import AgentState
 from app.services.llm.gemini_client import gemini_client
 from app.services.rag.grounding import retrieve_medical_grounding
+from app.services.rag.reputable_sources import retrieve_reputable_citations
+import asyncio
+
+
+def _provider_weight(provider: str) -> float:
+    weights = {
+        "LocalRAG": 1.0,
+        "PubMed": 0.95,
+        "OpenFDA": 0.9,
+        "MedlinePlus": 0.85,
+        "ClinicalTrials": 0.8,
+    }
+    return weights.get(provider, 0.75)
+
+
+def _rank_citations(citations: list[dict]) -> list[dict]:
+    ranked = sorted(
+        citations,
+        key=lambda c: float(c.get("similarity", 0.0) or 0.0) * _provider_weight(str(c.get("provider") or "")),
+        reverse=True,
+    )
+    for idx, citation in enumerate(ranked, start=1):
+        citation["rank"] = idx
+    return ranked
 
 class DiagnosisAssessment(BaseModel):
     """Structured schema for clinical diagnosis and reasoning."""
@@ -38,17 +62,21 @@ async def diagnostician_node(state: AgentState) -> AgentState:
             f"[Vision Severity]: {vision.get('severity', 'N/A')}\n"
         )
 
+    retrieved_docs, reputable_docs = await asyncio.gather(
+        retrieve_medical_grounding(raw_text, top_k=3),
+        retrieve_reputable_citations(raw_text, top_k=6),
+    )
+    merged_citations = _rank_citations([*(retrieved_docs or []), *(reputable_docs or [])])[:8]
 
-    retrieved_docs = await retrieve_medical_grounding(raw_text, top_k=3)
-    if retrieved_docs:
+    if merged_citations:
         rag_text = "\n\n".join(
             [
                 f"[{doc['rank']}] {doc['title']}\nExcerpt: {doc['excerpt']}"
-                for doc in retrieved_docs
+                for doc in merged_citations
             ]
         )
     else:
-        rag_text = "No matching medical source was found in the grounded knowledge base."
+        rag_text = "No matching medical source was found in the grounded knowledge base or trusted external references."
 
 
     system_prompt = f"""You are a senior clinical diagnostician. 
@@ -93,7 +121,7 @@ async def diagnostician_node(state: AgentState) -> AgentState:
     return {
         **state,
         "diagnosis": diagnosis_output.model_dump(),
-        "rag_context": retrieved_docs,
+        "rag_context": merged_citations,
         "confidence": diagnosis_output.confidence,
         "next_step": "treatment_planning",
         "messages": [diag_msg]

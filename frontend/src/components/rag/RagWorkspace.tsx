@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Upload, FileText, Search } from 'lucide-react';
 import { ragAPI, RagQueryResponse, RagUploadResponse } from '@/lib/api/rag';
 
-const MAX_PDF_BYTES = 40 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
 
 export function RagWorkspace() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -37,13 +37,19 @@ export function RagWorkspace() {
       return;
     }
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Only PDF files are allowed.');
+    const lowerName = file.name.toLowerCase();
+    const isPdf = lowerName.endsWith('.pdf');
+    const isTxt = lowerName.endsWith('.txt');
+    const isMd = lowerName.endsWith('.md');
+    const isCsv = lowerName.endsWith('.csv');
+
+    if (!isPdf && !isTxt && !isMd && !isCsv) {
+      alert('Only PDF, TXT, MD, and CSV files are allowed.');
       return;
     }
 
-    if (file.size > MAX_PDF_BYTES) {
-      alert('PDF exceeds 40MB limit. Please upload a smaller file.');
+    if (file.size > MAX_UPLOAD_BYTES) {
+      alert('File exceeds 40MB limit. Please upload a smaller file.');
       return;
     }
 
@@ -52,18 +58,18 @@ export function RagWorkspace() {
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      alert('Please select a PDF first.');
+      alert('Please select a PDF, TXT, MD, or CSV file first.');
       return;
     }
 
     try {
       setUploading(true);
-      const result = await ragAPI.uploadPdf(selectedFile);
+      const result = await ragAPI.uploadFile(selectedFile);
       setUploadResult(result);
-      alert('PDF uploaded and indexed successfully.');
+      alert('File uploaded and indexed successfully.');
     } catch (error: any) {
       console.error('RAG upload error:', error);
-      alert(error.response?.data?.detail || 'Failed to upload PDF');
+      alert(error.response?.data?.detail || 'Failed to upload file');
     } finally {
       setUploading(false);
     }
@@ -95,16 +101,16 @@ export function RagWorkspace() {
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Upload className="w-5 h-5" />
-          Upload Report PDF (Max 40MB)
+          Upload Report File (PDF/TXT/MD/CSV, Max 40MB)
         </h3>
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="pdfUpload">Medical Report PDF</Label>
+            <Label htmlFor="pdfUpload">Medical Report File</Label>
             <Input
               id="pdfUpload"
               type="file"
-              accept="application/pdf"
+              accept=".pdf,.txt,.md,.csv,text/plain,text/markdown,text/csv,application/pdf"
               onChange={(e) => onFileChange(e.target.files?.[0] || null)}
               disabled={uploading}
             />
@@ -121,7 +127,7 @@ export function RagWorkspace() {
             {uploading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Indexing PDF...
+                Indexing file...
               </>
             ) : (
               <>

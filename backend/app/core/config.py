@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     # --- Google AI & Vertex AI ---
     # Updated to the current production standard while keeping your location
     GOOGLE_API_KEY: str = ""
+    NCBI_API_KEY: str = ""
+    OPENFDA_API_KEY: str = ""
     GOOGLE_CLOUD_PROJECT: str = "" 
     VERTEX_AI_LOCATION: str = "us-central1"
     GOOGLE_APPLICATION_CREDENTIALS: str = ""

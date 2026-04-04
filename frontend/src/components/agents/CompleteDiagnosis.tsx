@@ -60,6 +60,7 @@ export function CompleteDiagnosis() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosisResponse | null>(null);
   const [showSources, setShowSources] = useState(false);
+  const hasCitations = Boolean(result?.citations && result.citations.length > 0);
 
   // Form state
   const [symptoms, setSymptoms] = useState('');
@@ -109,6 +110,16 @@ export function CompleteDiagnosis() {
       ROUTINE: 'bg-green-100 text-green-800 border-green-300',
     };
     return colors[urgency] || 'bg-gray-100 text-gray-800 border-gray-300';
+  };
+
+  const getProviderBadgeClass = (provider?: string) => {
+    const key = (provider || '').toLowerCase();
+    if (key === 'pubmed') return 'bg-blue-100 text-blue-800 border-blue-300';
+    if (key === 'openfda') return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    if (key === 'medlineplus') return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+    if (key === 'clinicaltrials') return 'bg-purple-100 text-purple-800 border-purple-300';
+    if (key === 'localrag') return 'bg-amber-100 text-amber-800 border-amber-300';
+    return 'bg-gray-100 text-gray-800 border-gray-300';
   };
 
   const renderCitationAnchors = (text: string) => {
@@ -321,27 +332,52 @@ export function CompleteDiagnosis() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Treatment Plan</h3>
-                {result.citations && result.citations.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => setShowSources(!showSources)}>
-                    View Source
-                  </Button>
-                )}
+                <Button variant="outline" size="sm" onClick={() => setShowSources(!showSources)}>
+                  {showSources ? 'Hide Sources' : 'View Source'}
+                </Button>
               </div>
 
-              {showSources && result.citations && result.citations.length > 0 && (
+              {showSources && (
                 <div className="mb-4 p-4 border rounded-lg bg-amber-50/50 space-y-3">
                   <p className="text-sm font-medium text-amber-800">Grounded Medical Sources</p>
-                  {result.citations.map((citation) => (
-                    <div key={citation.id} className="p-3 bg-white rounded border">
-                      <p className="text-sm font-semibold">
-                        [{citation.rank}] {citation.title}
-                      </p>
-                      {citation.source && (
-                        <p className="text-xs text-gray-500 mt-1">Source: {citation.source}</p>
-                      )}
-                      <p className="text-xs text-gray-700 mt-2">{citation.excerpt}</p>
+                  {hasCitations ? (
+                    result.citations.map((citation) => (
+                      <div key={citation.id} className="p-3 bg-white rounded border">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold">
+                            [{citation.rank}] {citation.title}
+                          </p>
+                          {citation.provider && (
+                            <Badge variant="outline" className={getProviderBadgeClass(citation.provider)}>
+                              {citation.provider}
+                            </Badge>
+                          )}
+                        </div>
+                        {citation.source && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Source:{' '}
+                            {citation.source.startsWith('http') ? (
+                              <a
+                                href={citation.source}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                {citation.source}
+                              </a>
+                            ) : (
+                              citation.source
+                            )}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-700 mt-2">{citation.excerpt}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 bg-white rounded border text-sm text-amber-900">
+                      No grounded source was found for this diagnosis. Try adding more specific symptoms or use the RAG page to upload relevant clinical documents.
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 

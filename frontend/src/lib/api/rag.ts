@@ -29,7 +29,7 @@ export interface RagQueryRequest {
 }
 
 export const ragAPI = {
-  uploadPdf: async (file: File): Promise<RagUploadResponse> => {
+  uploadFile: async (file: File): Promise<RagUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
 
