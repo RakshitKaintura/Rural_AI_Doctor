@@ -116,12 +116,9 @@ async def emergency_action_node(state: AgentState) -> AgentState:
     nearest = nearby_facilities[0] if nearby_facilities else None
     message_lines = [
         "CRITICAL: Potential life-threatening condition detected.",
-        "Call emergency services immediately and move to nearest CHC.",
+        "Call emergency services immediately.",
+        "Tap the Nearby Hospitals button to find hospitals around you.",
     ]
-    if nearest:
-        message_lines.append(
-            f"Nearest CHC: {nearest['name']} ({nearest['distance_km']} km) | {nearest['contact_number']}"
-        )
 
     logger.warning("Emergency path triggered for patient_id=%s", state.get("patient_id"))
     return {
