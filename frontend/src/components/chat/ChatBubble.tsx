@@ -28,14 +28,11 @@ export function ChatBubble({ message }: ChatBubbleProps) {
   const rawPhone = nearestFacility?.contact_number || fallbackFromText?.contact_number || '';
   const phone = rawPhone.replace(/[^\d+]/g, '');
   const mapsUrl = (() => {
-    const coords = nearestFacility?.coordinates;
-    if (coords?.lat != null && coords?.lng != null) {
-      return `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`;
+    const userCoords = criticalMeta?.user_location;
+    if (userCoords?.lat != null && userCoords?.lng != null) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`hospitals near ${userCoords.lat},${userCoords.lng}`)}`;
     }
-    if (facilityName) {
-      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facilityName)}`;
-    }
-    return null;
+    return 'https://www.google.com/maps/search/?api=1&query=hospitals%20near%20me';
   })();
   const parsedTimestamp = message.timestamp instanceof Date
     ? message.timestamp
@@ -90,7 +87,7 @@ export function ChatBubble({ message }: ChatBubbleProps) {
                 <Button asChild size="sm" variant="outline">
                   <a href={mapsUrl} target="_blank" rel="noreferrer">
                     <ExternalLink className="w-4 h-4 mr-2" />
-                    Open Maps
+                    Nearby Hospitals
                   </a>
                 </Button>
               )}
