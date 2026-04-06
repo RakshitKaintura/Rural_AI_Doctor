@@ -14,6 +14,7 @@ class AgentState(TypedDict):
     """
     patient_id:Optional[int]
     symptoms:str
+    user_location: Optional[Dict[str, float]]
     age:Optional[int]
     gender:Optional[str]
     medical_history:Optional[str]
@@ -25,9 +26,12 @@ class AgentState(TypedDict):
 
     triage_result:Optional[Dict[str,Any]]
     syptom_analysis:Optional[Dict[str,Any]]
+    symptom_analysis:Optional[Dict[str,Any]]
     rag_context:Optional[List[Dict[str,Any]]]
     diagnosis:Optional[Dict[str,Any]]
     treatment_plan:Optional[Dict[str,Any]]
+    is_emergency: bool
+    emergency_info: Optional[Dict[str, Any]]
 
 
     urgency_level:str

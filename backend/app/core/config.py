@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
     FRONTEND_URL: str = "http://localhost:3000"
+    EMERGENCY_ALERT_EMAIL: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -8,6 +8,7 @@ interface ChatBubbleProps {
 
 export function ChatBubble({ message }: ChatBubbleProps) {
   const isUser = message.role === 'user';
+  const isCriticalAssistant = !isUser && message.metadata?.status === 'CRITICAL';
   const parsedTimestamp = message.timestamp instanceof Date
     ? message.timestamp
     : new Date(message.timestamp as unknown as string);
@@ -39,8 +40,13 @@ export function ChatBubble({ message }: ChatBubbleProps) {
           'rounded-lg px-4 py-2 wrap-break-words',
           isUser
             ? 'bg-blue-500 text-white'
-            : 'bg-gray-100 text-gray-900'
+            : isCriticalAssistant
+              ? 'bg-red-100 text-red-950 border border-red-300'
+              : 'bg-gray-100 text-gray-900'
         )}>
+          {isCriticalAssistant && (
+            <p className="text-xs font-bold uppercase mb-1">Critical Alert</p>
+          )}
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         </div>
         <span className="text-xs text-gray-500 mt-1">

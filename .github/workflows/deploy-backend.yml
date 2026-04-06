@@ -1,4 +1,4 @@
-name: Deploy Backend to Railway
+name: Deploy Backend to Render
 
 on:
   push:
@@ -9,31 +9,19 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Deployment depends on tests passing first
   deploy:
     name: Production Deployment
     runs-on: ubuntu-latest
-    # Optional: Uncomment the next line if you want to ensure tests pass before deploying
-    # needs: test 
     
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-      
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-      
-      - name: Deploy to Railway
+      - name: Trigger Render Backend Deploy
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          # Move into the backend directory before deploying
-          cd backend
-          # --detach allows the CLI to trigger the build and exit, 
-          # letting Railway's native dashboard handle the logs.
-          railway up --service backend --detach
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "Missing required secret: RENDER_DEPLOY_HOOK_URL"
+            exit 1
+          fi
+
+          # Trigger a production deploy through Render's deploy hook.
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"

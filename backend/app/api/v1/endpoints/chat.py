@@ -15,10 +15,27 @@ from app.services.llm.prompts import (
 from app.core.config import settings
 from app.db.session import get_db
 from app.db.models import ChatHistory, AIDecisionAudit
+from app.services.agents.nodes.emergency_action import emergency_action_node
+from app.services.agents.state import AgentState
 from datetime import datetime
 import uuid
 
 router = APIRouter()
+
+RED_FLAG_KEYWORDS = [
+    "chest pain",
+    "difficulty breathing",
+    "shortness of breath",
+    "severe bleeding",
+    "unconscious",
+    "stroke",
+    "seizure",
+]
+
+
+def _detect_red_flags(text: str) -> list[str]:
+    lowered = text.lower()
+    return [keyword for keyword in RED_FLAG_KEYWORDS if keyword in lowered]
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -35,8 +52,49 @@ async def chat(
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         
       
-        system_prompt = request.system_prompt or MEDICAL_SYSTEM_PROMPT
-        response_text = await gemini_client.chat(messages, system_prompt)
+        latest_user_text = messages[-1]["content"] if messages else ""
+        red_flags = _detect_red_flags(latest_user_text)
+        metadata = None
+
+        if red_flags:
+            user_lat = request.user_location.lat if request.user_location else 28.6139
+            user_lng = request.user_location.lng if request.user_location else 77.2090
+            emergency_state: AgentState = {
+                "patient_id": None,
+                "symptoms": latest_user_text,
+                "user_location": {"lat": user_lat, "lng": user_lng},
+                "age": None,
+                "gender": None,
+                "medical_history": None,
+                "vitals": None,
+                "has_image": False,
+                "image_type": None,
+                "image_analysis": None,
+                "triage_result": None,
+                "symptom_analysis": {"red_flags": red_flags},
+                "rag_context": None,
+                "diagnosis": None,
+                "treatment_plan": None,
+                "is_emergency": True,
+                "emergency_info": {
+                    "status": "CRITICAL",
+                    "red_flags": red_flags,
+                },
+                "urgency_level": "EMERGENCY",
+                "next_step": "emergency_action",
+                "messages": [],
+                "final_report": None,
+                "confidence": 0.0,
+            }
+            emergency_result = await emergency_action_node(emergency_state)
+            metadata = emergency_result.get("emergency_info")
+            response_text = emergency_result.get(
+                "final_report",
+                "CRITICAL: Potential life-threatening condition detected.",
+            )
+        else:
+            system_prompt = request.system_prompt or MEDICAL_SYSTEM_PROMPT
+            response_text = await gemini_client.chat(messages, system_prompt)
         
         if isinstance(response_text, list):
             # Extract text if response_text is a list of dicts (LangChain behavior for some models)
@@ -77,7 +135,8 @@ async def chat(
         return ChatResponse(
             message=response_text,
             session_id=session_id,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            metadata=metadata,
         )
     
     except Exception as e:

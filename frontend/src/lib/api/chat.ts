@@ -9,12 +9,28 @@ export interface ChatRequest {
   messages: ChatMessage[];
   session_id?: string;
   system_prompt?: string;
+  user_location?: {
+    lat: number;
+    lng: number;
+  };
 }
 
 export interface ChatResponse {
   message: string;
   session_id: string;
   timestamp: string;
+  metadata?: {
+    status?: 'CRITICAL' | 'OK';
+    red_flags?: string[];
+    user_location?: { lat: number; lng: number };
+    nearby_facilities?: Array<{
+      name: string;
+      distance_km: number;
+      contact_number: string;
+      coordinates: { lat: number; lng: number };
+    }>;
+    first_aid_instructions?: string[];
+  };
 }
 
 export interface SymptomAnalysisRequest {

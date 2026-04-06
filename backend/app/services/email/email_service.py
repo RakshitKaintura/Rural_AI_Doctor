@@ -117,6 +117,34 @@ class EmailService:
             attachments=attachments
         )
 
+    async def send_emergency_alert_email(
+        self,
+        alert_email: str,
+        user_id: Optional[int],
+        user_location: dict[str, float],
+        emergency_info: dict[str, Any],
+    ) -> None:
+        """Sends emergency escalation details to on-call health workers."""
+        facilities = emergency_info.get("nearby_facilities") or []
+        top_facility = facilities[0] if facilities else {}
+        html = f"""
+        <div style="font-family: sans-serif; max-width: 640px;">
+            <h2 style="color: #b91c1c;">Emergency Alert Triggered</h2>
+            <p><strong>User ID:</strong> {user_id or 'guest'}</p>
+            <p><strong>Status:</strong> {emergency_info.get('status', 'CRITICAL')}</p>
+            <p><strong>Location:</strong> {user_location.get('lat')}, {user_location.get('lng')}</p>
+            <p><strong>Red Flags:</strong> {', '.join(emergency_info.get('red_flags') or ['not specified'])}</p>
+            <hr />
+            <p><strong>Nearest Facility:</strong> {top_facility.get('name', 'N/A')}</p>
+            <p><strong>Contact:</strong> {top_facility.get('contact_number', 'N/A')}</p>
+        </div>
+        """
+        await self._dispatch_email(
+            subject="Emergency Escalation - Rural AI Doctor",
+            recipients=[alert_email],
+            body=html,
+        )
+
     async def _dispatch_email(
         self, 
         subject: str, 

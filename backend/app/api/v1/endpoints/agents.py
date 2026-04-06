@@ -43,6 +43,7 @@ async def multi_agent_diagnosis(
         initial_state: AgentState = {
             "patient_id": request.patient_id,
             "symptoms": request.symptoms,
+            "user_location": request.user_location.model_dump() if request.user_location else None,
             "age": request.age,
             "gender": request.gender,
             "medical_history": request.medical_history,
@@ -58,6 +59,8 @@ async def multi_agent_diagnosis(
             "rag_context": None,
             "diagnosis": None,
             "treatment_plan": None,
+            "is_emergency": False,
+            "emergency_info": None,
             "next_step": None,
             "final_report": None
         }
@@ -69,6 +72,7 @@ async def multi_agent_diagnosis(
         
         diagnosis_info = final_state.get('diagnosis') or {}
         treatment_info = final_state.get('treatment_plan') or {}
+        emergency_info = final_state.get("emergency_info")
         
       
         workflow_steps = []
@@ -129,23 +133,25 @@ async def multi_agent_diagnosis(
             user_id=current_user.id,
             patient_id=patient_record.id,
             symptoms=request.symptoms,
-            diagnosis=diagnosis_info.get('primary_diagnosis', 'Unable to determine'),
+            diagnosis=diagnosis_info.get('primary_diagnosis', 'Emergency escalation triggered' if emergency_info else 'Unable to determine'),
             confidence=float(final_state.get('confidence', 0.0) or 0.0),
             severity=severity_map.get(urgency, 'Low'),
             treatment_plan=treatment_info,
-            full_report=final_state.get('final_report', 'Report generation failed.'),
+            full_report=final_state.get('final_report', 'Emergency escalation triggered.' if emergency_info else 'Report generation failed.'),
             urgency_level=urgency,
         )
         db.add(diagnosis_row)
         await db.commit()
 
         return DiagnosisResponse(
-            diagnosis=diagnosis_info.get('primary_diagnosis', 'Unable to determine'),
+            diagnosis=diagnosis_info.get('primary_diagnosis', 'Emergency escalation triggered' if emergency_info else 'Unable to determine'),
             confidence=final_state.get('confidence', 0.0),
             differential_diagnoses=diagnosis_info.get('differential_diagnoses', []),
             treatment_plan=treatment_info,
             urgency_level=final_state.get('urgency_level', 'ROUTINE'),
-            final_report=final_state.get('final_report', 'Report generation failed.'),
+            final_report=final_state.get('final_report', 'Emergency escalation triggered.' if emergency_info else 'Report generation failed.'),
+            status="CRITICAL" if emergency_info else "OK",
+            emergency_info=emergency_info,
             workflow_steps=workflow_steps,
             is_grounded_in_rag=bool(final_state.get('rag_context')),
             citations=final_state.get('rag_context') or []

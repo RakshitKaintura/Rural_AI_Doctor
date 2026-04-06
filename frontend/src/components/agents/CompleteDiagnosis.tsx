@@ -14,7 +14,9 @@ import {
   AlertTriangle,
   CheckCircle,
   FileText,
-  Activity
+  Activity,
+  PhoneCall,
+  ExternalLink
 } from 'lucide-react';
 import { agentsAPI, DiagnosisResponse } from '@/lib/api/agents';
 
@@ -56,6 +58,27 @@ function getCitationRanks(text: string, citations: DiagnosisResponse['citations'
   return [citations[0].rank];
 }
 
+async function getCurrentLocation(): Promise<{ lat: number; lng: number } | undefined> {
+  if (typeof window === 'undefined' || !navigator.geolocation) {
+    return undefined;
+  }
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      () => resolve(undefined),
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+    );
+  });
+}
+
+function buildDirectionsUrl(destinationLat: number, destinationLng: number, origin?: { lat: number; lng: number }) {
+  const base = 'https://www.google.com/maps/dir/?api=1';
+  if (origin) {
+    return `${base}&origin=${origin.lat},${origin.lng}&destination=${destinationLat},${destinationLng}`;
+  }
+  return `${base}&destination=${destinationLat},${destinationLng}`;
+}
+
 export function CompleteDiagnosis() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosisResponse | null>(null);
@@ -84,6 +107,7 @@ export function CompleteDiagnosis() {
       if (temperature) vitals.temperature = parseFloat(temperature);
       if (heartRate) vitals.heart_rate = parseInt(heartRate);
       if (bloodPressure) vitals.blood_pressure = bloodPressure;
+      const userLocation = await getCurrentLocation();
 
       const response = await agentsAPI.diagnose({
         symptoms: symptoms.trim(),
@@ -91,6 +115,7 @@ export function CompleteDiagnosis() {
         gender: gender || undefined,
         medical_history: medicalHistory || undefined,
         vitals: Object.keys(vitals).length > 0 ? vitals : undefined,
+        user_location: userLocation,
       });
 
       setResult(response);
@@ -138,6 +163,16 @@ export function CompleteDiagnosis() {
       </span>
     );
   };
+
+  const emergencyInfo = result?.status === 'CRITICAL' ? result.emergency_info : undefined;
+  const nearestFacility = emergencyInfo?.nearby_facilities?.[0];
+  const mapDirections = nearestFacility
+    ? buildDirectionsUrl(
+        nearestFacility.coordinates.lat,
+        nearestFacility.coordinates.lng,
+        emergencyInfo?.user_location
+      )
+    : null;
 
   return (
     <div className="space-y-6">
@@ -275,6 +310,70 @@ export function CompleteDiagnosis() {
       {/* Results */}
       {result && (
         <div className="space-y-4">
+          {emergencyInfo && (
+            <Card className="p-4 border-2 border-red-500 bg-red-50 space-y-3">
+              <div className="flex items-start gap-2 text-red-900">
+                <AlertTriangle className="w-6 h-6 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold">CRITICAL Emergency Escalation Active</h4>
+                  {emergencyInfo.red_flags && emergencyInfo.red_flags.length > 0 && (
+                    <p className="text-sm mt-1">
+                      Red Flags: {emergencyInfo.red_flags.join(', ')}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {nearestFacility && (
+                <div className="rounded-lg border border-red-200 bg-white p-3">
+                  <p className="text-sm font-semibold text-red-900">{nearestFacility.name}</p>
+                  <p className="text-sm text-gray-700">
+                    Distance: {nearestFacility.distance_km} km | Contact: {nearestFacility.contact_number}
+                  </p>
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    <Button asChild className="bg-red-600 hover:bg-red-700">
+                      <a href={`tel:${nearestFacility.contact_number.replace(/\s+/g, '')}`}>
+                        <PhoneCall className="w-4 h-4 mr-2" />
+                        Call Now
+                      </a>
+                    </Button>
+                    {mapDirections && (
+                      <Button asChild variant="outline">
+                        <a href={mapDirections} target="_blank" rel="noreferrer">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Open Maps
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {mapDirections && (
+                <div className="rounded-lg overflow-hidden border border-red-200 bg-white">
+                  <iframe
+                    title="Emergency route map"
+                    src={mapDirections}
+                    className="w-full h-64"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              )}
+
+              {emergencyInfo.first_aid_instructions && emergencyInfo.first_aid_instructions.length > 0 && (
+                <div className="rounded-lg border border-red-200 bg-white p-3">
+                  <p className="text-sm font-semibold text-red-900">First Aid Instructions</p>
+                  <ul className="mt-1 text-sm text-gray-800 list-disc list-inside">
+                    {emergencyInfo.first_aid_instructions.map((item, idx) => (
+                      <li key={`${item}-${idx}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
+          )}
+
           {/* Urgency Alert */}
           <Card className={`p-4 border-2 ${getUrgencyColor(result.urgency_level)}`}>
             <div className="flex items-center gap-3">

@@ -32,9 +32,26 @@ export interface DiagnosisRequest {
   vitals?: VitalSigns;
   image_analysis_id?: number;
   patient_id?: number;
+  user_location?: {
+    lat: number;
+    lng: number;
+  };
 }
 
 export interface DiagnosisResponse {
+  status?: 'OK' | 'CRITICAL';
+  emergency_info?: {
+    status: 'CRITICAL';
+    red_flags?: string[];
+    user_location?: { lat: number; lng: number };
+    nearby_facilities?: Array<{
+      name: string;
+      distance_km: number;
+      contact_number: string;
+      coordinates: { lat: number; lng: number };
+    }>;
+    first_aid_instructions?: string[];
+  };
   diagnosis: string; 
   confidence: number;
   differential_diagnoses: string[];
