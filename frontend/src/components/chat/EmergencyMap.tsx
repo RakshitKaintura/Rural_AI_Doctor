@@ -56,6 +56,7 @@ function ensureLeafletAssetsLoaded(): Promise<void> {
 export function EmergencyMap({ userLocation, facilityLocation, facilityName }: EmergencyMapProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const leafletMapRef = useRef<any>(null);
+  const fallbackRef = useRef<HTMLDivElement | null>(null);
 
   const routeBounds = useMemo(() => {
     const points = [facilityLocation];
@@ -128,7 +129,9 @@ export function EmergencyMap({ userLocation, facilityLocation, facilityName }: E
     };
 
     void setupMap().catch(() => {
-      // Non-blocking: emergency actions remain visible even if map assets fail to load.
+      if (fallbackRef.current) {
+        fallbackRef.current.style.display = 'flex';
+      }
     });
 
     return () => {
@@ -140,6 +143,15 @@ export function EmergencyMap({ userLocation, facilityLocation, facilityName }: E
     };
   }, [facilityLocation, facilityName, routeBounds, userLocation]);
 
-  return <div ref={mapRef} className="w-full h-56" aria-label="Emergency map with user and facility markers" />;
+  return (
+    <div className="relative w-full h-56" aria-label="Emergency map with user and facility markers">
+      <div ref={mapRef} className="absolute inset-0" />
+      <div
+        ref={fallbackRef}
+        className="absolute inset-0 hidden items-center justify-center bg-red-50 text-red-800 text-sm px-4 text-center"
+      >
+        Map preview unavailable. Use the Open Maps button for navigation to {facilityName}.
+      </div>
+    </div>
+  );
 }
-
