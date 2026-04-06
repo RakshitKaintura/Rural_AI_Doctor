@@ -10,15 +10,6 @@ import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 import { MessageInput } from './MessageInput';
 import { MessageList } from './MessageList';
-import { EmergencyMap } from './EmergencyMap';
-
-function buildDirectionsUrl(destinationLat: number, destinationLng: number, origin?: { lat: number; lng: number }) {
-  const base = 'https://www.google.com/maps/dir/?api=1';
-  if (origin) {
-    return `${base}&origin=${origin.lat},${origin.lng}&destination=${destinationLat},${destinationLng}`;
-  }
-  return `${base}&destination=${destinationLat},${destinationLng}`;
-}
 
 export function ChatInterface() {
   const { messages, isLoading, error, sendMessage } = useChat();
@@ -57,24 +48,10 @@ export function ChatInterface() {
 
   const nearestFacility = latestCriticalMetadata?.nearby_facilities?.[0] ?? fallbackFacility;
   const isCritical = latestCriticalMetadata?.status === 'CRITICAL';
-  const hasMappableDestination = Boolean(
-    nearestFacility?.coordinates &&
-      typeof nearestFacility.coordinates.lat === 'number' &&
-      typeof nearestFacility.coordinates.lng === 'number',
-  );
-  const mapDirections = hasMappableDestination
-    ? buildDirectionsUrl(
-        nearestFacility.coordinates.lat,
-        nearestFacility.coordinates.lng,
-        latestCriticalMetadata?.user_location,
-      )
-    : null;
-
   return (
     <div className="h-screen flex flex-col">
       <div className={`border-b p-4 flex items-center justify-between ${isCritical ? 'bg-red-50 border-red-300' : 'bg-white'}`}>
         <div>
-          <h1 className="text-2xl font-bold">Rural AI Doctor</h1>
           <p className={`text-sm ${isCritical ? 'text-red-700 font-semibold' : 'text-gray-600'}`}>
             {isCritical ? 'Emergency Mode Active - Immediate Action Required' : 'Your AI Medical Assistant'}
           </p>
@@ -108,16 +85,6 @@ export function ChatInterface() {
                     Distance: {nearestFacility.distance_km} km | Contact: {nearestFacility.contact_number}
                   </p>
                 )}
-              </div>
-            )}
-
-            {nearestFacility && hasMappableDestination && (
-              <div className="rounded-md overflow-hidden border border-red-200 bg-white">
-                <EmergencyMap
-                  userLocation={latestCriticalMetadata?.user_location}
-                  facilityLocation={nearestFacility.coordinates}
-                  facilityName={nearestFacility.name}
-                />
               </div>
             )}
 
