@@ -132,6 +132,30 @@ export function ChatInterface() {
               </div>
             )}
 
+            {(emergencyPhone || mapDirections) && (
+              <div className="rounded-md border border-red-200 bg-white p-3">
+                <p className="text-sm font-semibold text-red-900">Emergency Actions</p>
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {emergencyPhone && (
+                    <Button asChild className="bg-red-600 hover:bg-red-700">
+                      <a href={`tel:${emergencyPhone}`}>
+                        <PhoneCall className="w-4 h-4 mr-2" />
+                        Call Now
+                      </a>
+                    </Button>
+                  )}
+                  {mapDirections && (
+                    <Button asChild variant="outline">
+                      <a href={mapDirections} target="_blank" rel="noreferrer">
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Open Maps
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {nearestFacility && hasMappableDestination && (
               <div className="rounded-md overflow-hidden border border-red-200 bg-white">
                 <EmergencyMap
