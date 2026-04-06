@@ -12,6 +12,7 @@ jobs:
   deploy:
     name: Production Deployment
     runs-on: ubuntu-latest
+    environment: production
     
     steps:
       - name: Trigger Render Backend Deploy

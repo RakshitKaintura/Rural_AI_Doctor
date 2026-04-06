@@ -24,16 +24,45 @@ export function ChatInterface() {
   const { messages, isLoading, error, sendMessage } = useChat();
   const clearChat = useChatStore((state) => state.clearChat);
 
-  const latestCriticalMetadata = useMemo(() => {
-    const critical = [...messages]
+  const latestCriticalMessage = useMemo(() => {
+    return [...messages]
       .reverse()
       .find((msg) => msg.role === 'assistant' && msg.metadata?.status === 'CRITICAL');
-    return critical?.metadata;
   }, [messages]);
 
-  const nearestFacility = latestCriticalMetadata?.nearby_facilities?.[0];
+  const latestCriticalMetadata: any = useMemo(() => {
+    const meta = (latestCriticalMessage?.metadata ?? {}) as any;
+    if (meta?.emergency_info && typeof meta.emergency_info === 'object') {
+      return {
+        ...meta.emergency_info,
+        ...meta,
+        status: meta.status ?? meta.emergency_info.status,
+      };
+    }
+    return meta;
+  }, [latestCriticalMessage]);
+
+  const fallbackFacility = useMemo(() => {
+    const content = latestCriticalMessage?.content ?? '';
+    const match = content.match(/Nearest CHC:\s*(.+?)\s*\(([\d.]+)\s*km\)\s*\|\s*([+\d\- ]+)/i);
+    if (!match) return null;
+
+    return {
+      name: match[1].trim(),
+      distance_km: Number(match[2]),
+      contact_number: match[3].trim(),
+      coordinates: latestCriticalMetadata?.user_location,
+    };
+  }, [latestCriticalMessage, latestCriticalMetadata?.user_location]);
+
+  const nearestFacility = latestCriticalMetadata?.nearby_facilities?.[0] ?? fallbackFacility;
   const isCritical = latestCriticalMetadata?.status === 'CRITICAL';
-  const mapDirections = nearestFacility
+  const hasMappableDestination = Boolean(
+    nearestFacility?.coordinates &&
+      typeof nearestFacility.coordinates.lat === 'number' &&
+      typeof nearestFacility.coordinates.lng === 'number',
+  );
+  const mapDirections = hasMappableDestination
     ? buildDirectionsUrl(
         nearestFacility.coordinates.lat,
         nearestFacility.coordinates.lng,
@@ -94,7 +123,7 @@ export function ChatInterface() {
               </div>
             )}
 
-            {nearestFacility && (
+            {nearestFacility && hasMappableDestination && (
               <div className="rounded-md overflow-hidden border border-red-200 bg-white">
                 <EmergencyMap
                   userLocation={latestCriticalMetadata?.user_location}
@@ -108,7 +137,7 @@ export function ChatInterface() {
               <div className="rounded-md border border-red-200 bg-white p-3">
                 <p className="text-sm font-semibold text-red-900">First Aid Instructions</p>
                 <ul className="text-sm text-gray-800 mt-1 list-disc list-inside">
-                  {latestCriticalMetadata.first_aid_instructions.map((item, idx) => (
+                  {latestCriticalMetadata.first_aid_instructions.map((item: string, idx: number) => (
                     <li key={`${item}-${idx}`}>{item}</li>
                   ))}
                 </ul>
