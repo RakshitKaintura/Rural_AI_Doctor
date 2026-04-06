@@ -57,41 +57,58 @@ async def chat(
         metadata = None
 
         if red_flags:
-            user_lat = request.user_location.lat if request.user_location else 28.6139
-            user_lng = request.user_location.lng if request.user_location else 77.2090
-            emergency_state: AgentState = {
-                "patient_id": None,
-                "symptoms": latest_user_text,
-                "user_location": {"lat": user_lat, "lng": user_lng},
-                "age": None,
-                "gender": None,
-                "medical_history": None,
-                "vitals": None,
-                "has_image": False,
-                "image_type": None,
-                "image_analysis": None,
-                "triage_result": None,
-                "symptom_analysis": {"red_flags": red_flags},
-                "rag_context": None,
-                "diagnosis": None,
-                "treatment_plan": None,
-                "is_emergency": True,
-                "emergency_info": {
+            if request.user_location:
+                user_lat = request.user_location.lat
+                user_lng = request.user_location.lng
+                emergency_state: AgentState = {
+                    "patient_id": None,
+                    "symptoms": latest_user_text,
+                    "user_location": {"lat": user_lat, "lng": user_lng},
+                    "age": None,
+                    "gender": None,
+                    "medical_history": None,
+                    "vitals": None,
+                    "has_image": False,
+                    "image_type": None,
+                    "image_analysis": None,
+                    "triage_result": None,
+                    "symptom_analysis": {"red_flags": red_flags},
+                    "rag_context": None,
+                    "diagnosis": None,
+                    "treatment_plan": None,
+                    "is_emergency": True,
+                    "emergency_info": {
+                        "status": "CRITICAL",
+                        "red_flags": red_flags,
+                    },
+                    "urgency_level": "EMERGENCY",
+                    "next_step": "emergency_action",
+                    "messages": [],
+                    "final_report": None,
+                    "confidence": 0.0,
+                }
+                emergency_result = await emergency_action_node(emergency_state)
+                metadata = emergency_result.get("emergency_info")
+                response_text = emergency_result.get(
+                    "final_report",
+                    "CRITICAL: Potential life-threatening condition detected.",
+                )
+            else:
+                metadata = {
                     "status": "CRITICAL",
                     "red_flags": red_flags,
-                },
-                "urgency_level": "EMERGENCY",
-                "next_step": "emergency_action",
-                "messages": [],
-                "final_report": None,
-                "confidence": 0.0,
-            }
-            emergency_result = await emergency_action_node(emergency_state)
-            metadata = emergency_result.get("emergency_info")
-            response_text = emergency_result.get(
-                "final_report",
-                "CRITICAL: Potential life-threatening condition detected.",
-            )
+                    "user_location": None,
+                    "nearby_facilities": [],
+                    "first_aid_instructions": [
+                        "Keep the patient calm and seated upright.",
+                        "Avoid giving food or drink while awaiting emergency help.",
+                    ],
+                }
+                response_text = (
+                    "CRITICAL: Potential life-threatening condition detected.\n"
+                    "Call emergency services immediately.\n"
+                    "Location access was unavailable, so nearest CHC could not be auto-resolved."
+                )
         else:
             system_prompt = request.system_prompt or MEDICAL_SYSTEM_PROMPT
             response_text = await gemini_client.chat(messages, system_prompt)

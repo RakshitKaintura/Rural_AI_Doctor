@@ -27,13 +27,7 @@ export function ChatBubble({ message }: ChatBubbleProps) {
   const facilityName = nearestFacility?.name || fallbackFromText?.name;
   const rawPhone = nearestFacility?.contact_number || fallbackFromText?.contact_number || '';
   const phone = rawPhone.replace(/[^\d+]/g, '');
-  const mapsUrl = (() => {
-    const userCoords = criticalMeta?.user_location;
-    if (userCoords?.lat != null && userCoords?.lng != null) {
-      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`hospitals near ${userCoords.lat},${userCoords.lng}`)}`;
-    }
-    return 'https://www.google.com/maps/search/?api=1&query=hospitals%20near%20me';
-  })();
+  const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=hospital+near+me';
   const parsedTimestamp = message.timestamp instanceof Date
     ? message.timestamp
     : new Date(message.timestamp as unknown as string);

@@ -17,7 +17,8 @@ async function getCurrentLocation(): Promise<{ lat: number; lng: number } | unde
         });
       },
       () => resolve(undefined),
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 },
+      // Slightly longer timeout and non-high-accuracy mode improve success rate on desktop browsers.
+      { enableHighAccuracy: false, timeout: 12000, maximumAge: 120000 },
     );
   });
 }
