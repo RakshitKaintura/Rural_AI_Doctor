@@ -1,6 +1,7 @@
 import { Message } from '@/types/chat';
+import { Button } from '@/components/ui/button';
 import { cn } from 'lib/utils';
-import { User, Bot } from 'lucide-react';
+import { User, Bot, ExternalLink, PhoneCall } from 'lucide-react';
 
 interface ChatBubbleProps {
   message: Message;
@@ -9,6 +10,32 @@ interface ChatBubbleProps {
 export function ChatBubble({ message }: ChatBubbleProps) {
   const isUser = message.role === 'user';
   const isCriticalAssistant = !isUser && message.metadata?.status === 'CRITICAL';
+  const metadata: any = message.metadata || {};
+  const criticalMeta =
+    metadata?.emergency_info && typeof metadata.emergency_info === 'object'
+      ? { ...metadata.emergency_info, ...metadata, status: metadata.status ?? metadata.emergency_info.status }
+      : metadata;
+  const nearestFacility = criticalMeta?.nearby_facilities?.[0];
+  const fallbackFromText = (() => {
+    const match = message.content.match(/Nearest CHC:\s*(.+?)\s*\(([\d.]+)\s*km\)\s*\|\s*([+\d\- ]+)/i);
+    if (!match) return null;
+    return {
+      name: match[1].trim(),
+      contact_number: match[3].trim(),
+    };
+  })();
+  const facilityName = nearestFacility?.name || fallbackFromText?.name;
+  const phone = (nearestFacility?.contact_number || fallbackFromText?.contact_number || '').replace(/\s+/g, '');
+  const mapsUrl = (() => {
+    const coords = nearestFacility?.coordinates;
+    if (coords?.lat != null && coords?.lng != null) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`;
+    }
+    if (facilityName) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facilityName)}`;
+    }
+    return null;
+  })();
   const parsedTimestamp = message.timestamp instanceof Date
     ? message.timestamp
     : new Date(message.timestamp as unknown as string);
@@ -48,6 +75,26 @@ export function ChatBubble({ message }: ChatBubbleProps) {
             <p className="text-xs font-bold uppercase mb-1">Critical Alert</p>
           )}
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          {isCriticalAssistant && (phone || mapsUrl) && (
+            <div className="mt-3 flex gap-2 flex-wrap">
+              {phone && (
+                <Button asChild size="sm" className="bg-red-600 hover:bg-red-700">
+                  <a href={`tel:${phone}`}>
+                    <PhoneCall className="w-4 h-4 mr-2" />
+                    Call Now
+                  </a>
+                </Button>
+              )}
+              {mapsUrl && (
+                <Button asChild size="sm" variant="outline">
+                  <a href={mapsUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open Maps
+                  </a>
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         <span className="text-xs text-gray-500 mt-1">
           {timeLabel}

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useChat } from '@/hooks/useChat';
 import { useChatStore } from '@/store/chatStore';
-import { AlertTriangle, ExternalLink, PhoneCall, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 import { MessageInput } from './MessageInput';
 import { MessageList } from './MessageList';
@@ -56,9 +56,6 @@ export function ChatInterface() {
   }, [latestCriticalMessage, latestCriticalMetadata?.user_location]);
 
   const nearestFacility = latestCriticalMetadata?.nearby_facilities?.[0] ?? fallbackFacility;
-  const emergencyPhone = nearestFacility?.contact_number
-    ? nearestFacility.contact_number.replace(/\s+/g, '')
-    : null;
   const isCritical = latestCriticalMetadata?.status === 'CRITICAL';
   const hasMappableDestination = Boolean(
     nearestFacility?.coordinates &&
@@ -101,7 +98,7 @@ export function ChatInterface() {
               </div>
             </div>
 
-            {(nearestFacility || emergencyPhone) && (
+            {nearestFacility && (
               <div className="rounded-md border border-red-200 bg-white p-3">
                 {nearestFacility?.name && (
                   <p className="font-medium text-sm text-red-900">Nearest Facility: {nearestFacility.name}</p>
@@ -111,48 +108,6 @@ export function ChatInterface() {
                     Distance: {nearestFacility.distance_km} km | Contact: {nearestFacility.contact_number}
                   </p>
                 )}
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  {emergencyPhone && (
-                    <Button asChild className="bg-red-600 hover:bg-red-700">
-                      <a href={`tel:${emergencyPhone}`}>
-                        <PhoneCall className="w-4 h-4 mr-2" />
-                        Call Now
-                      </a>
-                    </Button>
-                  )}
-                  {mapDirections && (
-                    <Button asChild variant="outline">
-                      <a href={mapDirections} target="_blank" rel="noreferrer">
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Open Maps
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {(emergencyPhone || mapDirections) && (
-              <div className="rounded-md border border-red-200 bg-white p-3">
-                <p className="text-sm font-semibold text-red-900">Emergency Actions</p>
-                <div className="mt-2 flex gap-2 flex-wrap">
-                  {emergencyPhone && (
-                    <Button asChild className="bg-red-600 hover:bg-red-700">
-                      <a href={`tel:${emergencyPhone}`}>
-                        <PhoneCall className="w-4 h-4 mr-2" />
-                        Call Now
-                      </a>
-                    </Button>
-                  )}
-                  {mapDirections && (
-                    <Button asChild variant="outline">
-                      <a href={mapDirections} target="_blank" rel="noreferrer">
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Open Maps
-                      </a>
-                    </Button>
-                  )}
-                </div>
               </div>
             )}
 
