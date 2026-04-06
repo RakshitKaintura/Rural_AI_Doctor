@@ -24,27 +24,31 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def get_nearby_clinics(lat: float, lng: float, limit: int = 3) -> list[dict[str, Any]]:
-    """Mock CHC lookup tool used by the emergency node."""
+    """Mock CHC lookup tool used by the emergency node.
+
+    Generates location-relative facilities so emergency actions stay useful
+    regardless of the user's region.
+    """
     clinic_catalog = [
         {
             "name": "Primary Community Health Centre",
             "contact_number": "+91-98765-11001",
-            "coordinates": {"lat": 28.6202, "lng": 77.2100},
+            "coordinates": {"lat": round(lat + 0.012, 6), "lng": round(lng + 0.008, 6)},
         },
         {
             "name": "Rural Block CHC - South",
             "contact_number": "+91-98765-11002",
-            "coordinates": {"lat": 28.6043, "lng": 77.1941},
+            "coordinates": {"lat": round(lat - 0.017, 6), "lng": round(lng + 0.006, 6)},
         },
         {
             "name": "District Community Health Centre",
             "contact_number": "+91-98765-11003",
-            "coordinates": {"lat": 28.6384, "lng": 77.2342},
+            "coordinates": {"lat": round(lat + 0.019, 6), "lng": round(lng - 0.011, 6)},
         },
         {
             "name": "Emergency Stabilization Unit - CHC",
             "contact_number": "+91-98765-11004",
-            "coordinates": {"lat": 28.5922, "lng": 77.2266},
+            "coordinates": {"lat": round(lat - 0.009, 6), "lng": round(lng - 0.014, 6)},
         },
     ]
 

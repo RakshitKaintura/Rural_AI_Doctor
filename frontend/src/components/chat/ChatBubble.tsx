@@ -1,7 +1,7 @@
 import { Message } from '@/types/chat';
 import { Button } from '@/components/ui/button';
 import { cn } from 'lib/utils';
-import { User, Bot, ExternalLink, PhoneCall } from 'lucide-react';
+import { User, Bot, ExternalLink, PhoneCall, Copy } from 'lucide-react';
 
 interface ChatBubbleProps {
   message: Message;
@@ -25,11 +25,12 @@ export function ChatBubble({ message }: ChatBubbleProps) {
     };
   })();
   const facilityName = nearestFacility?.name || fallbackFromText?.name;
-  const phone = (nearestFacility?.contact_number || fallbackFromText?.contact_number || '').replace(/\s+/g, '');
+  const rawPhone = nearestFacility?.contact_number || fallbackFromText?.contact_number || '';
+  const phone = rawPhone.replace(/[^\d+]/g, '');
   const mapsUrl = (() => {
     const coords = nearestFacility?.coordinates;
     if (coords?.lat != null && coords?.lng != null) {
-      return `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`;
+      return `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`;
     }
     if (facilityName) {
       return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(facilityName)}`;
@@ -91,6 +92,23 @@ export function ChatBubble({ message }: ChatBubbleProps) {
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Open Maps
                   </a>
+                </Button>
+              )}
+              {phone && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(phone);
+                    } catch {
+                      // No-op fallback if clipboard API is unavailable.
+                    }
+                  }}
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy Number
                 </Button>
               )}
             </div>
