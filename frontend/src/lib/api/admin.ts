@@ -21,6 +21,62 @@ interface DistributionResponse {
   urgency: Record<string, number>;
 }
 
+export interface AuditLogRecord {
+  id: number;
+  session_id: string | null;
+  source_endpoint: string;
+  decision_type: string;
+  input_summary: string | null;
+  output_summary: string | null;
+  confidence_band: string | null;
+  urgency_level: string | null;
+  model_name: string;
+  model_version: string | null;
+  prompt_version: string | null;
+  override_applied: boolean;
+  clinician_feedback: string | null;
+  created_at: string;
+}
+
+export interface AuditLogsResponse {
+  items: AuditLogRecord[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+export interface SessionMessage {
+  id: number;
+  role: string;
+  content: string;
+  created_at: string;
+}
+
+export interface SessionHistoryResponse {
+  session_id: string;
+  messages: SessionMessage[];
+}
+
+export interface BiasCheckRow {
+  demographic: string;
+  count: number;
+}
+
+export interface BiasUrgencyRow extends BiasCheckRow {
+  urgency_level: string;
+}
+
+export interface BiasConfidenceRow extends BiasCheckRow {
+  confidence_band: string;
+}
+
+export interface BiasCheckResponse {
+  gender_urgency: BiasUrgencyRow[];
+  gender_confidence: BiasConfidenceRow[];
+  age_urgency: BiasUrgencyRow[];
+  age_confidence: BiasConfidenceRow[];
+}
+
 export const adminAPI = {
   getOverview: async (): Promise<AdminStats> => {
     const response = await apiClient.get('/admin/stats/overview');
@@ -55,6 +111,29 @@ export const adminAPI = {
     const response = await apiClient.get('/admin/diagnoses/recent', {
       params: { limit },
     });
+    return response.data;
+  },
+
+  getAuditLogs: async (params?: { page?: number; page_size?: number; q?: string }) => {
+    const response = await apiClient.get<AuditLogsResponse>('/admin/audit/logs', { params });
+    return response.data;
+  },
+
+  getAuditSession: async (sessionId: string) => {
+    const response = await apiClient.get<SessionHistoryResponse>(`/admin/audit/sessions/${sessionId}`);
+    return response.data;
+  },
+
+  updateAuditFeedback: async (
+    auditId: number,
+    payload: { clinician_feedback: string | null; override_applied: boolean },
+  ) => {
+    const response = await apiClient.patch(`/admin/audit/${auditId}/feedback`, payload);
+    return response.data;
+  },
+
+  getBiasCheck: async () => {
+    const response = await apiClient.get<BiasCheckResponse>('/admin/analytics/bias-check');
     return response.data;
   },
 };

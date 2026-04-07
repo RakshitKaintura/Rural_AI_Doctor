@@ -1,6 +1,9 @@
 'use client';
 
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
+import { AuditLogTable } from '@/components/admin/audit/AuditLogTable';
+import { BiasMonitor } from '@/components/admin/audit/BiasMonitor';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth/authContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -25,7 +28,25 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <AdminDashboard />
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="audit-logs">AI Audit Logs</TabsTrigger>
+          <TabsTrigger value="bias-monitoring">Bias Monitoring</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <AdminDashboard />
+        </TabsContent>
+
+        <TabsContent value="audit-logs">
+          <AuditLogTable />
+        </TabsContent>
+
+        <TabsContent value="bias-monitoring">
+          <BiasMonitor />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
