@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, desc, func, or_, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -300,108 +300,77 @@ async def get_bias_check_analytics(
     db: DBDep,
 ):
     """Demographic distributions for urgency and confidence (gender/age groups)."""
-    age_group = case(
-        (Patient.age.is_(None), "Unknown"),
-        (Patient.age < 18, "0-17"),
-        (Patient.age < 36, "18-35"),
-        (Patient.age < 61, "36-60"),
-        else_="60+",
-    ).label("age_group")
-
-    confidence_band = case(
-        (Diagnosis.confidence.is_(None), "Unknown"),
-        (Diagnosis.confidence < 0.40, "Low"),
-        (Diagnosis.confidence < 0.75, "Medium"),
-        else_="High",
-    ).label("confidence_band")
-
-    gender_urgency_rows = (
-        await db.execute(
-            select(
-                func.coalesce(Patient.gender, "Unknown").label("demographic"),
-                Diagnosis.urgency_level.label("urgency_level"),
-                func.count(Diagnosis.id).label("count"),
-            )
-            .select_from(Diagnosis)
-            .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
-            .group_by(func.coalesce(Patient.gender, "Unknown"), Diagnosis.urgency_level)
-            .order_by(func.coalesce(Patient.gender, "Unknown"), Diagnosis.urgency_level)
+    result = await db.execute(
+        select(
+            Diagnosis.urgency_level,
+            Diagnosis.confidence,
+            Patient.gender,
+            Patient.age,
         )
-    ).all()
+        .select_from(Diagnosis)
+        .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
+    )
+    rows = result.all()
 
-    gender_confidence_rows = (
-        await db.execute(
-            select(
-                func.coalesce(Patient.gender, "Unknown").label("demographic"),
-                confidence_band,
-                func.count(Diagnosis.id).label("count"),
-            )
-            .select_from(Diagnosis)
-            .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
-            .group_by(func.coalesce(Patient.gender, "Unknown"), confidence_band)
-            .order_by(func.coalesce(Patient.gender, "Unknown"), confidence_band)
-        )
-    ).all()
+    def _age_group(age: int | None) -> str:
+        if age is None:
+            return "Unknown"
+        if age < 18:
+            return "0-17"
+        if age < 36:
+            return "18-35"
+        if age < 61:
+            return "36-60"
+        return "60+"
 
-    age_urgency_rows = (
-        await db.execute(
-            select(
-                age_group,
-                Diagnosis.urgency_level.label("urgency_level"),
-                func.count(Diagnosis.id).label("count"),
-            )
-            .select_from(Diagnosis)
-            .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
-            .group_by(age_group, Diagnosis.urgency_level)
-            .order_by(age_group, Diagnosis.urgency_level)
-        )
-    ).all()
+    def _confidence_band(value: float | None) -> str:
+        if value is None:
+            return "Unknown"
+        if value < 0.40:
+            return "Low"
+        if value < 0.75:
+            return "Medium"
+        return "High"
 
-    age_confidence_rows = (
-        await db.execute(
-            select(
-                age_group,
-                confidence_band,
-                func.count(Diagnosis.id).label("count"),
-            )
-            .select_from(Diagnosis)
-            .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
-            .group_by(age_group, confidence_band)
-            .order_by(age_group, confidence_band)
+    gender_urgency_counts: dict[tuple[str, str], int] = {}
+    gender_conf_counts: dict[tuple[str, str], int] = {}
+    age_urgency_counts: dict[tuple[str, str], int] = {}
+    age_conf_counts: dict[tuple[str, str], int] = {}
+
+    for row in rows:
+        demographic_gender = row.gender or "Unknown"
+        demographic_age = _age_group(row.age)
+        urgency = (row.urgency_level or "UNKNOWN").upper()
+        conf_band = _confidence_band(row.confidence)
+
+        gender_urgency_counts[(demographic_gender, urgency)] = (
+            gender_urgency_counts.get((demographic_gender, urgency), 0) + 1
         )
-    ).all()
+        gender_conf_counts[(demographic_gender, conf_band)] = (
+            gender_conf_counts.get((demographic_gender, conf_band), 0) + 1
+        )
+        age_urgency_counts[(demographic_age, urgency)] = (
+            age_urgency_counts.get((demographic_age, urgency), 0) + 1
+        )
+        age_conf_counts[(demographic_age, conf_band)] = (
+            age_conf_counts.get((demographic_age, conf_band), 0) + 1
+        )
 
     return {
         "gender_urgency": [
-            {
-                "demographic": row.demographic or "Unknown",
-                "urgency_level": row.urgency_level or "UNKNOWN",
-                "count": int(row.count or 0),
-            }
-            for row in gender_urgency_rows
+            {"demographic": demo, "urgency_level": urgency, "count": count}
+            for (demo, urgency), count in sorted(gender_urgency_counts.items())
         ],
         "gender_confidence": [
-            {
-                "demographic": row.demographic or "Unknown",
-                "confidence_band": row.confidence_band or "Unknown",
-                "count": int(row.count or 0),
-            }
-            for row in gender_confidence_rows
+            {"demographic": demo, "confidence_band": band, "count": count}
+            for (demo, band), count in sorted(gender_conf_counts.items())
         ],
         "age_urgency": [
-            {
-                "demographic": row.age_group or "Unknown",
-                "urgency_level": row.urgency_level or "UNKNOWN",
-                "count": int(row.count or 0),
-            }
-            for row in age_urgency_rows
+            {"demographic": demo, "urgency_level": urgency, "count": count}
+            for (demo, urgency), count in sorted(age_urgency_counts.items())
         ],
         "age_confidence": [
-            {
-                "demographic": row.age_group or "Unknown",
-                "confidence_band": row.confidence_band or "Unknown",
-                "count": int(row.count or 0),
-            }
-            for row in age_confidence_rows
+            {"demographic": demo, "confidence_band": band, "count": count}
+            for (demo, band), count in sorted(age_conf_counts.items())
         ],
     }
