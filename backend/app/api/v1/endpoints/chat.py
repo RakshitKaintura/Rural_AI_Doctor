@@ -13,6 +13,7 @@ from app.services.llm.prompts import (
     TRIAGE_PROMPT
 )
 from app.core.config import settings
+from app.core.audit_confidence import derive_confidence_band
 from app.db.session import get_db
 from app.db.models import ChatHistory, AIDecisionAudit
 from app.services.agents.nodes.emergency_action import emergency_action_node
@@ -141,7 +142,11 @@ async def chat(
             decision_type="chat",
             input_summary=messages[-1]["content"],  # type: ignore
             output_summary=response_text[:2000],
-            confidence_band="medium",
+            confidence_band=derive_confidence_band(
+                urgency_level="EMERGENCY" if red_flags else "ROUTINE",
+                red_flags_count=len(red_flags),
+                output_summary=response_text[:2000],
+            ),
             model_name=settings.GEMINI_MODEL,
             model_version="v1",
             prompt_version="medical-system-v1",
@@ -191,7 +196,11 @@ async def analyze_symptoms(request: SymptomAnalysisRequest, db: AsyncSession = D
             decision_type="symptom_analysis",
             input_summary=request.symptoms,
             output_summary=analysis[:2000] if isinstance(analysis, str) else str(analysis)[:2000],
-            confidence_band="medium",
+            confidence_band=derive_confidence_band(
+                urgency_level=severity,
+                red_flags_count=1 if severity in {"EMERGENCY", "URGENT"} else 0,
+                output_summary=triage_result if isinstance(triage_result, str) else str(triage_result),
+            ),
             urgency_level=severity.lower(),
             model_name=settings.GEMINI_MODEL,
             model_version="v1",

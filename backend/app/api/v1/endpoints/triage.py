@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_active_user
 from app.core.config import settings
+from app.core.audit_confidence import derive_confidence_band
 from app.db.models import AIDecisionAudit, TriageAssessment, User
 from app.db.session import get_db
 from app.schemas.triage import (
@@ -117,7 +118,11 @@ async def assess_triage(
     )
 
     db.add(triage_record)
-    confidence_band = "high" if urgency_level == "emergency" else "medium"
+    confidence_band = derive_confidence_band(
+        urgency_level=urgency_level,
+        red_flags_count=len(red_flags),
+        output_summary=action,
+    )
     audit_record = AIDecisionAudit(
         user_id=current_user.id,
         source_endpoint="/api/v1/triage/assess",

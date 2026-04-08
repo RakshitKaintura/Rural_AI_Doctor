@@ -322,6 +322,7 @@ async def get_bias_check_analytics(
                 Diagnosis.urgency_level.label("urgency_level"),
                 func.count(Diagnosis.id).label("count"),
             )
+            .select_from(Diagnosis)
             .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
             .group_by(func.coalesce(Patient.gender, "Unknown"), Diagnosis.urgency_level)
             .order_by(func.coalesce(Patient.gender, "Unknown"), Diagnosis.urgency_level)
@@ -335,6 +336,7 @@ async def get_bias_check_analytics(
                 confidence_band,
                 func.count(Diagnosis.id).label("count"),
             )
+            .select_from(Diagnosis)
             .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
             .group_by(func.coalesce(Patient.gender, "Unknown"), confidence_band)
             .order_by(func.coalesce(Patient.gender, "Unknown"), confidence_band)
@@ -348,6 +350,7 @@ async def get_bias_check_analytics(
                 Diagnosis.urgency_level.label("urgency_level"),
                 func.count(Diagnosis.id).label("count"),
             )
+            .select_from(Diagnosis)
             .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
             .group_by(age_group, Diagnosis.urgency_level)
             .order_by(age_group, Diagnosis.urgency_level)
@@ -361,6 +364,7 @@ async def get_bias_check_analytics(
                 confidence_band,
                 func.count(Diagnosis.id).label("count"),
             )
+            .select_from(Diagnosis)
             .outerjoin(Patient, Diagnosis.patient_id == Patient.id)
             .group_by(age_group, confidence_band)
             .order_by(age_group, confidence_band)
