@@ -69,3 +69,7 @@ class AdminBiasCheckResponse(BaseModel):
     age_urgency: list[BiasUrgencyDistributionRow]
     age_confidence: list[BiasConfidenceDistributionRow]
 
+
+class AdminSeedDemoAuditResponse(BaseModel):
+    inserted: int
+    environment: str

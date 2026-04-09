@@ -1,7 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { ShieldCheck, Zap, Loader2 } from 'lucide-react';
+import { useAuth } from '@/lib/auth/authContext';
 
 // FIX: Dynamically import the component and disable SSR.
 // This prevents the "Hydration Mismatch" error by ensuring it only loads in the browser.
@@ -21,6 +24,23 @@ const VoiceDiagnosis = dynamic(
 );
 
 export default function VoicePage() {
+  const { isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/login?next=/voice');
+    }
+  }, [isAuthenticated, loading, router]);
+
+  if (loading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl animate-in fade-in duration-500">
       {/* Header Section */}

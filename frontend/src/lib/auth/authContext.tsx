@@ -14,6 +14,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_COOKIE_NAME = 'rural_ai_auth';
+
+function setAuthCookie() {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${AUTH_COOKIE_NAME}=1; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+}
+
+function clearAuthCookie() {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${AUTH_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,9 +38,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const currentUser = await authAPI.getCurrentUser();
           setUser(currentUser);
+          setAuthCookie();
         } catch (error) {
           localStorage.removeItem('access_token');
+          clearAuthCookie();
         }
+      } else {
+        clearAuthCookie();
       }
       setLoading(false);
     };
@@ -41,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('access_token', response.access_token);
     const currentUser = await authAPI.getCurrentUser();
     setUser(currentUser);
+    setAuthCookie();
   };
 
   const register = async (data: RegisterData) => {
@@ -52,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('access_token');
     setUser(null);
+    clearAuthCookie();
   };
 
   return (

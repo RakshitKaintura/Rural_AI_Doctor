@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.db.session import get_db
 from app.db.models import ImageAnalysis
+from app.core.deps import CurrentUser
 from app.schemas.vision import (
     ImageUploadResponse,
     ImageAnalysisRequest,
@@ -11,12 +12,17 @@ from app.schemas.vision import (
     XRayAnalysisResponse
 )
 from typing import Optional
-import json
 
 router = APIRouter()
+UNAUTHORIZED_RESPONSE = {
+    401: {
+        "description": "Not authenticated. Provide a valid Bearer access token.",
+    }
+}
 
-@router.post("/analyze", response_model=ImageAnalysisResponse)
+@router.post("/analyze", response_model=ImageAnalysisResponse, responses=UNAUTHORIZED_RESPONSE)
 async def analyze_medical_image(
+    current_user: CurrentUser,
     file: UploadFile = File(...),
     image_type: str = Form(...),
     patient_context: Optional[str] = Form(None),
@@ -53,6 +59,7 @@ async def analyze_medical_image(
         
        
         image_analysis = ImageAnalysis(
+            user_id=current_user.id,
             patient_id=patient_id, 
             image_type=image_type,
             original_filename=file.filename,
@@ -84,8 +91,9 @@ async def analyze_medical_image(
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
-@router.post("/xray/analyze", response_model=XRayAnalysisResponse)
+@router.post("/xray/analyze", response_model=XRayAnalysisResponse, responses=UNAUTHORIZED_RESPONSE)
 async def analyze_chest_xray(
+    current_user: CurrentUser,
     file: UploadFile = File(...),
     patient_id: Optional[int] = Form(None), 
     symptoms: Optional[str] = Form(None),
@@ -135,6 +143,7 @@ async def analyze_chest_xray(
         
         # Store in database
         image_analysis = ImageAnalysis(
+            user_id=current_user.id,
             patient_id=patient_id, 
             image_type="chest_xray",
             original_filename=file.filename,
@@ -229,11 +238,20 @@ async def analyze_chest_xray(
         raise HTTPException(status_code=500, detail=f"X-ray analysis failed: {str(e)}")
 
 
-@router.get("/analysis/{analysis_id}", response_model=ImageAnalysisResponse)
-async def get_analysis(analysis_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/analysis/{analysis_id}", response_model=ImageAnalysisResponse, responses=UNAUTHORIZED_RESPONSE)
+async def get_analysis(
+    analysis_id: int,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
     """Retrieve previous image analysis"""
     
-    result = await db.execute(select(ImageAnalysis).filter(ImageAnalysis.id == analysis_id))
+    result = await db.execute(
+        select(ImageAnalysis).filter(
+            ImageAnalysis.id == analysis_id,
+            ImageAnalysis.user_id == current_user.id,
+        )
+    )
     analysis = result.scalars().first()
     
     if not analysis:
@@ -252,14 +270,15 @@ async def get_analysis(analysis_id: int, db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.get("/history")
+@router.get("/history", responses=UNAUTHORIZED_RESPONSE)
 async def get_analysis_history(
+    current_user: CurrentUser,
     limit: int = 10,
     image_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     
-    query = select(ImageAnalysis)
+    query = select(ImageAnalysis).filter(ImageAnalysis.user_id == current_user.id)
     
     if image_type:
         query = query.filter(ImageAnalysis.image_type == image_type)

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db.session import get_db
-from app.db.models import VoiceInteraction, Diagnosis, Patient, User
+from app.db.models import VoiceInteraction, Diagnosis, Patient
 from app.schemas.voice import (
     TranscriptionResponse,
     TTSRequest,
@@ -21,13 +21,18 @@ from app.schemas.voice import (
 )
 from app.services.voice.audio_utils import audio_utils
 from app.services.agents.state import AgentState
-from app.core.deps import get_current_active_user
+from app.core.deps import CurrentUser
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+UNAUTHORIZED_RESPONSE = {
+    401: {
+        "description": "Not authenticated. Provide a valid Bearer access token.",
+    }
+}
 
-@router.get("/languages")
-async def get_supported_languages():
+@router.get("/languages", responses=UNAUTHORIZED_RESPONSE)
+async def get_supported_languages(current_user: CurrentUser):
     from app.services.voice.service import voice_service
   
     langs = voice_service.get_languages()
@@ -36,12 +41,13 @@ async def get_supported_languages():
         "tts_languages": langs
     }
 
-@router.post("/transcribe", response_model=TranscriptionResponse)
+@router.post("/transcribe", response_model=TranscriptionResponse, responses=UNAUTHORIZED_RESPONSE)
 async def transcribe_audio(
+    current_user: CurrentUser,
     file: UploadFile = File(...), # Key matches 'file' in test_transcribe_invalid_file
     language: Optional[str] = Form(None),
     session_id: Optional[str] = Form(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     from app.services.voice.service import voice_service
   
@@ -63,6 +69,7 @@ async def transcribe_audio(
         final_session_id = session_id or str(uuid.uuid4())
         voice_record = VoiceInteraction(
             session_id=final_session_id,
+            user_id=current_user.id,
             audio_filename=file.filename,
             transcription=transcription,
             language=clean_lang or "auto",
@@ -82,9 +89,9 @@ async def transcribe_audio(
         logger.error(f"STT Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
-@router.post("/tts")
-@router.post("/speak") 
-async def text_to_speech(request: TTSRequest):
+@router.post("/tts", responses=UNAUTHORIZED_RESPONSE)
+@router.post("/speak", responses=UNAUTHORIZED_RESPONSE) 
+async def text_to_speech(request: TTSRequest, current_user: CurrentUser):
     from app.services.voice.service import voice_service
 
     try:
@@ -98,15 +105,15 @@ async def text_to_speech(request: TTSRequest):
         logger.error(f"TTS Error: {str(e)}")
         raise HTTPException(status_code=500, detail="Voice generation failed.")
 
-@router.post("/diagnose", response_model=VoiceDiagnosisResponse)
+@router.post("/diagnose", response_model=VoiceDiagnosisResponse, responses=UNAUTHORIZED_RESPONSE)
 async def voice_diagnosis(
+    current_user: CurrentUser,
     audio: UploadFile = File(...), # Key matches 'audio' in test_voice_diagnose_async
     language: str = Form("en"),
     age: int = Form(...),
     gender: str = Form(...),
     medical_history: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
 ):
     from app.services.voice.service import voice_service
     from app.services.agents.graph import get_medical_agent_graph

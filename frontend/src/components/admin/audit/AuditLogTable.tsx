@@ -17,16 +17,23 @@ export function AuditLogTable() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'low' | 'medium' | 'high'>('all');
+  const [decisionFilter, setDecisionFilter] = useState<'all' | 'chat' | 'triage' | 'symptom_analysis'>('all');
+  const [overriddenFilter, setOverriddenFilter] = useState<'all' | 'true' | 'false'>('all');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [selectedAudit, setSelectedAudit] = useState<AuditLogRecord | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const isNonProd =
+    (process.env.NEXT_PUBLIC_ENVIRONMENT || process.env.NODE_ENV || 'production').toLowerCase() !== 'production';
 
   useEffect(() => {
     const timer = setTimeout(() => {
       void loadRows();
     }, 250);
     return () => clearTimeout(timer);
-  }, [page, search]);
+  }, [page, search, confidenceFilter, decisionFilter, overriddenFilter]);
 
   const loadRows = async () => {
     setLoading(true);
@@ -35,6 +42,10 @@ export function AuditLogTable() {
         page,
         page_size: PAGE_SIZE,
         q: search || undefined,
+        confidence_band: confidenceFilter === 'all' ? undefined : confidenceFilter,
+        decision_type: decisionFilter === 'all' ? undefined : decisionFilter,
+        overridden:
+          overriddenFilter === 'all' ? undefined : overriddenFilter === 'true',
       });
       setRows(data.items || []);
       setTotal(data.total || 0);
@@ -54,6 +65,90 @@ export function AuditLogTable() {
     setDialogOpen(true);
   };
 
+  const seedDemoData = async () => {
+    setSeeding(true);
+    try {
+      await adminAPI.seedDemoAudits(30);
+      setPage(1);
+      await loadRows();
+    } catch (err) {
+      console.error('Failed to seed demo audit rows', err);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      let exportPage = 1;
+      const allRows: AuditLogRecord[] = [];
+      let expectedTotal = 1;
+
+      while (allRows.length < expectedTotal) {
+        const data = await adminAPI.getAuditLogs({
+          page: exportPage,
+          page_size: 100,
+          q: search || undefined,
+          confidence_band: confidenceFilter === 'all' ? undefined : confidenceFilter,
+          decision_type: decisionFilter === 'all' ? undefined : decisionFilter,
+          overridden: overriddenFilter === 'all' ? undefined : overriddenFilter === 'true',
+        });
+        expectedTotal = data.total || 0;
+        if (!data.items?.length) break;
+        allRows.push(...data.items);
+        exportPage += 1;
+      }
+
+      const escapeCsv = (value: unknown) => {
+        const str = String(value ?? '');
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const header = [
+        'id',
+        'created_at',
+        'decision_type',
+        'confidence_band',
+        'override_applied',
+        'model_name',
+        'session_id',
+        'input_summary',
+        'output_summary',
+      ];
+      const body = allRows.map((row) =>
+        [
+          row.id,
+          row.created_at,
+          row.decision_type,
+          row.confidence_band,
+          row.override_applied,
+          row.model_name,
+          row.session_id,
+          row.input_summary,
+          row.output_summary,
+        ]
+          .map(escapeCsv)
+          .join(','),
+      );
+      const csv = [header.join(','), ...body].join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `ai_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export audit CSV', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card className="p-4">
@@ -70,9 +165,64 @@ export function AuditLogTable() {
           <Button variant="outline" onClick={() => void loadRows()} disabled={loading}>
             Refresh
           </Button>
+          <Button variant="outline" onClick={() => void exportCsv()} disabled={loading || exporting}>
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </Button>
+          {isNonProd && (
+            <Button variant="outline" onClick={() => void seedDemoData()} disabled={loading || seeding}>
+              {seeding ? 'Seeding...' : 'Seed Demo Data'}
+            </Button>
+          )}
           <p className="text-sm text-muted-foreground ml-auto">
             Showing page {page} of {totalPages} ({total} logs)
           </p>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="text-xs text-muted-foreground self-center mr-1">Confidence:</span>
+          {(['all', 'low', 'medium', 'high'] as const).map((item) => (
+            <Button
+              key={`confidence-${item}`}
+              size="sm"
+              variant={confidenceFilter === item ? 'default' : 'outline'}
+              onClick={() => {
+                setPage(1);
+                setConfidenceFilter(item);
+              }}
+            >
+              {item}
+            </Button>
+          ))}
+
+          <span className="text-xs text-muted-foreground self-center ml-3 mr-1">Decision:</span>
+          {(['all', 'chat', 'triage', 'symptom_analysis'] as const).map((item) => (
+            <Button
+              key={`decision-${item}`}
+              size="sm"
+              variant={decisionFilter === item ? 'default' : 'outline'}
+              onClick={() => {
+                setPage(1);
+                setDecisionFilter(item);
+              }}
+            >
+              {item}
+            </Button>
+          ))}
+
+          <span className="text-xs text-muted-foreground self-center ml-3 mr-1">Override:</span>
+          {(['all', 'true', 'false'] as const).map((item) => (
+            <Button
+              key={`override-${item}`}
+              size="sm"
+              variant={overriddenFilter === item ? 'default' : 'outline'}
+              onClick={() => {
+                setPage(1);
+                setOverriddenFilter(item);
+              }}
+            >
+              {item === 'all' ? 'all' : item === 'true' ? 'overridden' : 'not overridden'}
+            </Button>
+          ))}
         </div>
       </Card>
 
@@ -174,4 +324,3 @@ export function AuditLogTable() {
     </div>
   );
 }
-

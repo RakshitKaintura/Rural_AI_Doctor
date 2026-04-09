@@ -1,6 +1,28 @@
+'use client';
+
+import { useEffect } from 'react';
 import { RagWorkspace } from '@/components/rag/RagWorkspace';
+import { useAuth } from '@/lib/auth/authContext';
+import { useRouter } from 'next/navigation';
 
 export default function RagPage() {
+  const { isAuthenticated, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/login?next=/rag');
+    }
+  }, [isAuthenticated, loading, router]);
+
+  if (loading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-5xl">
       <div className="mb-8">

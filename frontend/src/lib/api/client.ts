@@ -38,6 +38,9 @@ apiClient.interceptors.response.use(
     if (status === 401) {
       console.warn('Session expired or unauthorized. Redirecting to login...');
       localStorage.removeItem('access_token');
+      if (typeof document !== 'undefined') {
+        document.cookie = 'rural_ai_auth=; Path=/; Max-Age=0; SameSite=Lax';
+      }
       
       // Prevent redirect loop if already on login page
       if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {

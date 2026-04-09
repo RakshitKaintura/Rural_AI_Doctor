@@ -18,10 +18,16 @@ from app.db.session import get_db
 from app.db.models import ChatHistory, AIDecisionAudit
 from app.services.agents.nodes.emergency_action import emergency_action_node
 from app.services.agents.state import AgentState
+from app.core.deps import CurrentUser
 from datetime import datetime
 import uuid
 
 router = APIRouter()
+UNAUTHORIZED_RESPONSE = {
+    401: {
+        "description": "Not authenticated. Provide a valid Bearer access token.",
+    }
+}
 
 RED_FLAG_KEYWORDS = [
     "chest pain",
@@ -39,10 +45,11 @@ def _detect_red_flags(text: str) -> list[str]:
     return [keyword for keyword in RED_FLAG_KEYWORDS if keyword in lowered]
 
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat", response_model=ChatResponse, responses=UNAUTHORIZED_RESPONSE)
 async def chat(
     request: ChatRequest,
-    db: AsyncSession = Depends(get_db)
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
 ):
    
     try:
@@ -123,6 +130,7 @@ async def chat(
       
         user_msg = ChatHistory(
             session_id=session_id,
+            user_id=current_user.id,
             role="user",
             content=messages[-1]["content"] # type: ignore
         )
@@ -131,12 +139,14 @@ async def chat(
         
         assistant_msg = ChatHistory(
             session_id=session_id,
+            user_id=current_user.id,
             role="assistant",
             content=response_text
         )
         db.add(assistant_msg)
 
         audit_record = AIDecisionAudit(
+            user_id=current_user.id,
             session_id=session_id,
             source_endpoint="/api/v1/chat/chat",
             decision_type="chat",
@@ -165,8 +175,16 @@ async def chat(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/analyze-symptoms", response_model=SymptomAnalysisResponse)
-async def analyze_symptoms(request: SymptomAnalysisRequest, db: AsyncSession = Depends(get_db)):
+@router.post(
+    "/analyze-symptoms",
+    response_model=SymptomAnalysisResponse,
+    responses=UNAUTHORIZED_RESPONSE,
+)
+async def analyze_symptoms(
+    request: SymptomAnalysisRequest,
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Analyze symptoms and provide preliminary assessment
     """
@@ -192,6 +210,7 @@ async def analyze_symptoms(request: SymptomAnalysisRequest, db: AsyncSession = D
         conditions = ["Condition analysis in progress"]
 
         audit_record = AIDecisionAudit(
+            user_id=current_user.id,
             source_endpoint="/api/v1/chat/analyze-symptoms",
             decision_type="symptom_analysis",
             input_summary=request.symptoms,
@@ -222,15 +241,19 @@ async def analyze_symptoms(request: SymptomAnalysisRequest, db: AsyncSession = D
 
 from sqlalchemy.future import select
 
-@router.get("/history/{session_id}")
+@router.get("/history/{session_id}", responses=UNAUTHORIZED_RESPONSE)
 async def get_chat_history(
     session_id: str,
-    db: AsyncSession = Depends(get_db)
+    current_user: CurrentUser,
+    db: AsyncSession = Depends(get_db),
 ):
     
     result = await db.execute(
         select(ChatHistory)
-        .filter(ChatHistory.session_id == session_id)
+        .filter(
+            ChatHistory.session_id == session_id,
+            ChatHistory.user_id == current_user.id,
+        )
         .order_by(ChatHistory.created_at)
     )
     history = result.scalars().all()

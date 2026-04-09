@@ -114,7 +114,14 @@ export const adminAPI = {
     return response.data;
   },
 
-  getAuditLogs: async (params?: { page?: number; page_size?: number; q?: string }) => {
+  getAuditLogs: async (params?: {
+    page?: number;
+    page_size?: number;
+    q?: string;
+    confidence_band?: string;
+    decision_type?: string;
+    overridden?: boolean;
+  }) => {
     const response = await apiClient.get<AuditLogsResponse>('/admin/audit/logs', { params });
     return response.data;
   },
@@ -135,5 +142,12 @@ export const adminAPI = {
   getBiasCheck: async () => {
     const response = await apiClient.get<BiasCheckResponse>('/admin/analytics/bias-check');
     return response.data;
+  },
+
+  seedDemoAudits: async (count: number = 20) => {
+    const response = await apiClient.post('/admin/audit/seed-demo', null, {
+      params: { count },
+    });
+    return response.data as { inserted: number; environment: string };
   },
 };

@@ -3,6 +3,7 @@ Admin endpoints for system-wide analytics and management.
 """
 
 from datetime import datetime, timedelta, timezone
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,12 +21,14 @@ from app.db.models import (
     VoiceInteraction,
 )
 from app.core.deps import get_current_admin_user
+from app.core.config import settings
 from app.schemas.admin import (
     AdminAuditFeedbackResponse,
     AdminAuditFeedbackUpdateRequest,
     AdminAuditLogsResponse,
     AdminAuditSessionResponse,
     AdminBiasCheckResponse,
+    AdminSeedDemoAuditResponse,
 )
 
 router = APIRouter(prefix="/admin", tags=["Admin Analytics"])
@@ -183,6 +186,9 @@ async def get_audit_logs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     q: str | None = Query(default=None, description="Search query over input/output/model/session"),
+    confidence_band: str | None = Query(default=None, description="Filter by low/medium/high"),
+    decision_type: str | None = Query(default=None, description="Filter by chat/triage/symptom_analysis"),
+    overridden: bool | None = Query(default=None, description="Filter override_applied true/false"),
 ):
     """Paginated deep-dive list of AI decision audits."""
     base_query = select(AIDecisionAudit)
@@ -198,6 +204,12 @@ async def get_audit_logs(
                 AIDecisionAudit.session_id.ilike(search),
             )
         )
+    if confidence_band:
+        base_query = base_query.where(AIDecisionAudit.confidence_band.ilike(confidence_band.strip()))
+    if decision_type:
+        base_query = base_query.where(AIDecisionAudit.decision_type.ilike(decision_type.strip()))
+    if overridden is not None:
+        base_query = base_query.where(AIDecisionAudit.override_applied == overridden)
 
     count_query = select(func.count()).select_from(base_query.subquery())
     total = int((await db.scalar(count_query)) or 0)
@@ -232,6 +244,51 @@ async def get_audit_logs(
         "page_size": page_size,
         "total": total,
     }
+
+
+@router.post("/audit/seed-demo", response_model=AdminSeedDemoAuditResponse)
+async def seed_demo_audit_logs(
+    current_admin: AdminDep,
+    db: DBDep,
+    count: int = Query(default=20, ge=1, le=200),
+):
+    """Seed synthetic audit rows for demo/testing. Disabled in production."""
+    env = (settings.ENVIRONMENT or "production").lower()
+    if env in {"production", "prod"}:
+        raise HTTPException(status_code=403, detail="Demo seeding is disabled in production")
+
+    templates = [
+        ("chat", "low", "Uncertain output. Needs clinician confirmation.", "URGENT"),
+        ("chat", "medium", "Routine advisory generated.", "ROUTINE"),
+        ("symptom_analysis", "high", "High confidence recommendation generated.", "ROUTINE"),
+        ("triage", "high", "Emergency escalation recommended with strong evidence.", "EMERGENCY"),
+    ]
+
+    now = datetime.now(timezone.utc)
+    for i in range(count):
+        decision_type, band, output_text, urgency = templates[i % len(templates)]
+        db.add(
+            AIDecisionAudit(
+                user_id=current_admin.id,
+                session_id=str(uuid.uuid4()),
+                source_endpoint="/api/v1/admin/audit/seed-demo",
+                decision_type=decision_type,
+                input_summary=f"Synthetic demo input #{i + 1}",
+                output_summary=output_text,
+                confidence_band=band,
+                urgency_level=urgency,
+                red_flags_json=["demo-flag"] if urgency == "EMERGENCY" else [],
+                model_name=settings.GEMINI_MODEL,
+                model_version="demo-v1",
+                prompt_version="demo-seed-v1",
+                override_applied=(i % 7 == 0),
+                clinician_feedback="Demo seeded row for UI testing." if i % 9 == 0 else None,
+                created_at=now - timedelta(minutes=i),
+            )
+        )
+
+    await db.commit()
+    return {"inserted": count, "environment": settings.ENVIRONMENT}
 
 
 @router.get("/audit/sessions/{session_id}", response_model=AdminAuditSessionResponse)

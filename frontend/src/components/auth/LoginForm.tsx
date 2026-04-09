@@ -24,7 +24,9 @@ export function LoginForm() {
 
     try {
       await login({ email, password });
-      router.push('/dashboard');
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const nextPath = params?.get('next');
+      router.push(nextPath || '/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed');
     } finally {
