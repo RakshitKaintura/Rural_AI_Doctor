@@ -17,6 +17,8 @@ export function AppointmentScheduler() {
   const [selectedSlot, setSelectedSlot] = useState('');
   const [appointmentType, setAppointmentType] = useState('consultation');
   const [notes, setNotes] = useState('');
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -28,6 +30,10 @@ export function AppointmentScheduler() {
   const loadAvailableSlots = async () => {
     if (!date) return;
 
+    setSlotsLoading(true);
+    setSlotsError(null);
+    setSelectedSlot('');
+
     try {
       const response = await apiClient.get('/appointments/slots/available', {
         params: { date: format(date, 'yyyy-MM-dd') },
@@ -37,8 +43,14 @@ export function AppointmentScheduler() {
         format(new Date(slot), 'HH:mm')
       );
       setAvailableSlots(slots);
-    } catch (error) {
+    } catch (error: any) {
+      setAvailableSlots([]);
+      const detail = error?.response?.data?.detail;
+      const fallback = 'Unable to load available slots. Please try again or check backend connectivity.';
+      setSlotsError(typeof detail === 'string' ? detail : fallback);
       console.error('Failed to load slots:', error);
+    } finally {
+      setSlotsLoading(false);
     }
   };
 
@@ -114,7 +126,11 @@ export function AppointmentScheduler() {
               <SelectValue placeholder="Select time" />
             </SelectTrigger>
             <SelectContent>
-              {availableSlots.length === 0 ? (
+              {slotsLoading ? (
+                <SelectItem value="loading" disabled>
+                  Loading slots...
+                </SelectItem>
+              ) : availableSlots.length === 0 ? (
                 <SelectItem value="none" disabled>
                   No slots available
                 </SelectItem>
@@ -127,6 +143,16 @@ export function AppointmentScheduler() {
               )}
             </SelectContent>
           </Select>
+          {slotsError ? (
+            <p className="mt-2 text-sm text-red-600">
+              Backend error: {slotsError}
+            </p>
+          ) : null}
+          {!slotsLoading && !slotsError && availableSlots.length === 0 ? (
+            <p className="mt-2 text-sm text-amber-700">
+              No slots available for this date. Try another date.
+            </p>
+          ) : null}
         </div>
 
         <div>
