@@ -106,12 +106,14 @@ const CARE_PILLARS: CarePillar[] = [
 ];
 
 const QUICK_ACCESS_ITEMS: QuickAccessItem[] = [
-  { title: 'Profile Settings', route: '/profile', icon: Settings },
+  { title: 'Clinical Ops', route: '/clinical-ops', icon: FlaskConical },
+  { title: 'RAG Assistant', route: '/rag', icon: BookOpen },
   { title: 'History', route: '/history', icon: History },
   { title: 'Appointments', route: '/appointments', icon: CalendarClock },
   { title: 'Export Data', route: '/export', icon: Download },
-  { title: 'Clinical Ops', route: '/clinical-ops', icon: FlaskConical },
-  { title: 'RAG Assistant', route: '/rag', icon: BookOpen },
+  
+  
+  { title: 'Profile Settings', route: '/profile', icon: Settings },
   { title: 'Logout', icon: LogOut, isAction: true },
 ];
 
