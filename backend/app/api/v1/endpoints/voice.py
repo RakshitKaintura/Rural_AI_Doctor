@@ -11,9 +11,10 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from fastapi.responses import StreamingResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.session import get_db
-from app.db.models import VoiceInteraction, Diagnosis, Patient
+from app.db.models import VoiceInteraction, Diagnosis, Patient, AIDecisionAudit
 from app.schemas.voice import (
     TranscriptionResponse,
     TTSRequest,
@@ -176,20 +177,43 @@ async def voice_diagnosis(
             urgency_level=urgency,
         )
         db.add(diagnosis_row)
-
-        # Persist voice diagnostic usage so dashboard metrics reflect real activity.
-        voice_record = VoiceInteraction(
-            session_id=interaction_session_id,
-            user_id=current_user.id,
-            patient_id=patient_record.id,
-            audio_filename=audio.filename,
-            transcription=symptoms_text,
-            language=language,
-            duration_seconds=audio_utils.get_audio_duration(audio_data),
-            confidence=float(final_state.get('confidence', 0.0) or 0.0),
-        )
-        db.add(voice_record)
         await db.commit()
+
+        # Best-effort metric/audit persistence should never break diagnosis response.
+        try:
+            duration_seconds = 0.0
+            try:
+                duration_seconds = float(audio_utils.get_audio_duration(audio_data) or 0.0)
+            except Exception:
+                duration_seconds = 0.0
+
+            voice_record = VoiceInteraction(
+                session_id=interaction_session_id,
+                user_id=current_user.id,
+                audio_filename=audio.filename,
+                transcription=symptoms_text,
+                language=language,
+                duration_seconds=duration_seconds,
+                confidence=float(final_state.get('confidence', 0.0) or 0.0),
+            )
+            db.add(voice_record)
+
+            audit_record = AIDecisionAudit(
+                user_id=current_user.id,
+                session_id=interaction_session_id,
+                source_endpoint="/api/v1/voice/diagnose",
+                decision_type="voice_diagnosis",
+                input_summary=symptoms_text[:2000],
+                output_summary=str(final_state.get('final_report', ''))[:2000],
+                model_name="voice-agent",
+                model_version="v1",
+                prompt_version="voice-diagnose-v1",
+            )
+            db.add(audit_record)
+            await db.commit()
+        except SQLAlchemyError as metric_error:
+            await db.rollback()
+            logger.warning("Voice metric persistence skipped: %s", metric_error)
         
         # Formulate Speech Summary
         diag_name = diagnosis_name

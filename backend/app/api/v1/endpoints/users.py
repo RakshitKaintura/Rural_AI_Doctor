@@ -111,7 +111,18 @@ async def get_user_dashboard(current_user: ActiveUser, db: DBDep):
         )
     except SQLAlchemyError:
         total_voice = await db.scalar(
-            select(func.count(VoiceInteraction.id)).join(Patient, VoiceInteraction.patient_id == Patient.id).where(Patient.user_id == current_user.id)
+            select(func.count(AIDecisionAudit.id)).where(
+                AIDecisionAudit.user_id == current_user.id,
+                AIDecisionAudit.decision_type == "voice_diagnosis",
+            )
+        )
+
+    if not total_voice:
+        total_voice = await db.scalar(
+            select(func.count(AIDecisionAudit.id)).where(
+                AIDecisionAudit.user_id == current_user.id,
+                AIDecisionAudit.decision_type == "voice_diagnosis",
+            )
         )
 
     try:
