@@ -121,6 +121,7 @@ async def voice_diagnosis(
     try:
         audio_data = await audio.read()
         symptoms_text = await voice_service.transcribe_audio(audio_data, language=language)
+        interaction_session_id = str(uuid.uuid4())
         
         # Orchestrate Agent Graph
         initial_state: AgentState = {
@@ -175,6 +176,19 @@ async def voice_diagnosis(
             urgency_level=urgency,
         )
         db.add(diagnosis_row)
+
+        # Persist voice diagnostic usage so dashboard metrics reflect real activity.
+        voice_record = VoiceInteraction(
+            session_id=interaction_session_id,
+            user_id=current_user.id,
+            patient_id=patient_record.id,
+            audio_filename=audio.filename,
+            transcription=symptoms_text,
+            language=language,
+            duration_seconds=audio_utils.get_audio_duration(audio_data),
+            confidence=float(final_state.get('confidence', 0.0) or 0.0),
+        )
+        db.add(voice_record)
         await db.commit()
         
         # Formulate Speech Summary

@@ -12,6 +12,27 @@ export function UserDashboard() {
 
   useEffect(() => {
     loadDashboard();
+
+    // Keep dashboard metrics fresh when user returns to tab or stays on page.
+    const onFocus = () => {
+      loadDashboard();
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        loadDashboard();
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    const intervalId = window.setInterval(loadDashboard, 30000);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   const loadDashboard = async () => {

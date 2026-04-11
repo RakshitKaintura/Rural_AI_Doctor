@@ -10,7 +10,8 @@ from sqlalchemy import func, desc, select, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.db.models import User, Diagnosis, ChatHistory, VoiceInteraction, ImageAnalysis
+from app.db.models import User, Diagnosis, ChatHistory, VoiceInteraction, ImageAnalysis, Patient, AIDecisionAudit
+from sqlalchemy.exc import SQLAlchemyError
 from app.core.deps import get_current_active_user
 from app.schemas.user import UserDashboard, DiagnosisHistory, UserStats
 
@@ -38,40 +39,102 @@ def _normalize_severity(value: str | None) -> str:
 @router.get("/dashboard", response_model=UserDashboard)
 async def get_user_dashboard(current_user: ActiveUser, db: DBDep):
     """Retrieves aggregate statistics for the user dashboard."""
-    total_diagnoses = await db.scalar(
-        select(func.count(Diagnosis.id)).where(Diagnosis.user_id == current_user.id)
-    )
-    
+    # Counts: try user_id-based queries, fallback to patient join if schema differs
+    try:
+        total_diagnoses = await db.scalar(
+            select(func.count(Diagnosis.id)).where(Diagnosis.user_id == current_user.id)
+        )
+    except SQLAlchemyError:
+        total_diagnoses = await db.scalar(
+            select(func.count(Diagnosis.id)).join(Patient, Diagnosis.patient_id == Patient.id).where(Patient.user_id == current_user.id)
+        )
+
+    # Recent diagnoses: materialize into plain dicts and normalize severity to satisfy Pydantic
     recent_query = (
         select(Diagnosis)
         .where(Diagnosis.user_id == current_user.id)
         .order_by(desc(Diagnosis.created_at))
         .limit(5)
     )
-    recent_result = await db.execute(recent_query)
-    recent_diagnoses = list(recent_result.scalars().all())
-    for diagnosis in recent_diagnoses:
-        diagnosis.severity = _normalize_severity(diagnosis.severity)
-    
-    total_chat_sessions = await db.scalar(
-        select(func.count(func.distinct(ChatHistory.session_id)))
-        .where(ChatHistory.user_id == current_user.id)
-    )
-    
-    total_voice = await db.scalar(
-        select(func.count(VoiceInteraction.id)).where(VoiceInteraction.user_id == current_user.id)
-    )
-    
-    total_images = await db.scalar(
-        select(func.count(ImageAnalysis.id)).where(ImageAnalysis.user_id == current_user.id)
-    )
-    
+    recent_result = None
+    try:
+        recent_result = await db.execute(recent_query)
+        recent_rows = list(recent_result.scalars().all())
+    except SQLAlchemyError:
+        # fallback: join patients
+        fallback_q = (
+            select(Diagnosis)
+            .join(Patient, Diagnosis.patient_id == Patient.id)
+            .where(Patient.user_id == current_user.id)
+            .order_by(desc(Diagnosis.created_at))
+            .limit(5)
+        )
+        recent_result = await db.execute(fallback_q)
+        recent_rows = list(recent_result.scalars().all())
+
+    recent_diagnoses = []
+    for d in recent_rows:
+        recent_diagnoses.append({
+            'id': int(d.id),
+            'diagnosis': d.diagnosis or '',
+            'confidence': float(d.confidence or 0.0),
+            'severity': _normalize_severity(d.severity),
+            'urgency_level': d.urgency_level or '',
+            'created_at': d.created_at,
+        })
+
+    try:
+        total_chat_sessions = await db.scalar(
+            select(func.count(func.distinct(ChatHistory.session_id))).where(ChatHistory.user_id == current_user.id)
+        )
+    except SQLAlchemyError:
+        # Legacy fallback when chat_history filters are unavailable
+        total_chat_sessions = await db.scalar(
+            select(func.count(AIDecisionAudit.id)).where(
+                AIDecisionAudit.user_id == current_user.id,
+                AIDecisionAudit.decision_type == "chat",
+            )
+        )
+
+    # If session IDs are missing in historical rows, fall back to chat audit count.
+    if not total_chat_sessions:
+        total_chat_sessions = await db.scalar(
+            select(func.count(AIDecisionAudit.id)).where(
+                AIDecisionAudit.user_id == current_user.id,
+                AIDecisionAudit.decision_type == "chat",
+            )
+        )
+
+    try:
+        total_voice = await db.scalar(
+            select(func.count(VoiceInteraction.id)).where(VoiceInteraction.user_id == current_user.id)
+        )
+    except SQLAlchemyError:
+        total_voice = await db.scalar(
+            select(func.count(VoiceInteraction.id)).join(Patient, VoiceInteraction.patient_id == Patient.id).where(Patient.user_id == current_user.id)
+        )
+
+    try:
+        total_images = await db.scalar(
+            select(func.count(ImageAnalysis.id)).where(ImageAnalysis.user_id == current_user.id)
+        )
+    except SQLAlchemyError:
+        total_images = await db.scalar(
+            select(func.count(ImageAnalysis.id)).join(Patient, ImageAnalysis.patient_id == Patient.id).where(Patient.user_id == current_user.id)
+        )
+
     last_act_query = (
         select(Diagnosis.created_at)
         .where(Diagnosis.user_id == current_user.id)
         .order_by(desc(Diagnosis.created_at))
     )
-    last_activity = await db.scalar(last_act_query)
+    try:
+        last_activity = await db.scalar(last_act_query)
+    except SQLAlchemyError:
+        # fallback: find last activity via patient's diagnoses
+        last_activity = await db.scalar(
+            select(Diagnosis.created_at).join(Patient, Diagnosis.patient_id == Patient.id).where(Patient.user_id == current_user.id).order_by(desc(Diagnosis.created_at))
+        )
     
     return UserDashboard(
         total_diagnoses=total_diagnoses or 0,
@@ -97,11 +160,32 @@ async def get_diagnosis_history(
         .offset(skip)
         .limit(limit)
     )
-    result = await db.execute(query)
-    diagnoses = list(result.scalars().all())
-    for diagnosis in diagnoses:
-        diagnosis.severity = _normalize_severity(diagnosis.severity)
-    return diagnoses
+    try:
+        result = await db.execute(query)
+        rows = list(result.scalars().all())
+    except SQLAlchemyError:
+        fallback_q = (
+            select(Diagnosis)
+            .join(Patient, Diagnosis.patient_id == Patient.id)
+            .where(Patient.user_id == current_user.id)
+            .order_by(desc(Diagnosis.created_at))
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await db.execute(fallback_q)
+        rows = list(result.scalars().all())
+
+    out = []
+    for d in rows:
+        out.append({
+            'id': int(d.id),
+            'diagnosis': d.diagnosis or '',
+            'confidence': float(d.confidence or 0.0),
+            'severity': _normalize_severity(d.severity),
+            'urgency_level': d.urgency_level or '',
+            'created_at': d.created_at,
+        })
+    return out
 
 @router.get("/history/diagnoses/search", response_model=list[DiagnosisHistory])
 async def search_diagnosis_history(
@@ -143,14 +227,34 @@ async def search_diagnosis_history(
         
     # Execute with ordering and pagination
     stmt = stmt.order_by(desc(Diagnosis.created_at)).offset(skip).limit(limit)
-    result = await db.execute(stmt)
-    diagnoses = list(result.scalars().all())
-    
-    # Ensure UI consistency through normalization
-    for diagnosis in diagnoses:
-        diagnosis.severity = _normalize_severity(diagnosis.severity)
-        
-    return diagnoses
+    try:
+        result = await db.execute(stmt)
+        rows = list(result.scalars().all())
+    except SQLAlchemyError:
+        # fallback: join patients
+        fallback_stmt = (
+            select(Diagnosis)
+            .join(Patient, Diagnosis.patient_id == Patient.id)
+            .where(Patient.user_id == current_user.id)
+            .order_by(desc(Diagnosis.created_at))
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await db.execute(fallback_stmt)
+        rows = list(result.scalars().all())
+
+    out = []
+    for d in rows:
+        out.append({
+            'id': int(d.id),
+            'diagnosis': d.diagnosis or '',
+            'confidence': float(d.confidence or 0.0),
+            'severity': _normalize_severity(d.severity),
+            'urgency_level': d.urgency_level or '',
+            'created_at': d.created_at,
+        })
+
+    return out
 
 @router.get("/stats", response_model=UserStats)
 async def get_user_stats(current_user: ActiveUser, db: DBDep):
