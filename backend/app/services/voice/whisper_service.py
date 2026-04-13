@@ -28,11 +28,41 @@ class WhisperService:
         logger.info("🎙️ Cloud Voice Service (Gemini V2 SDK) initialized")
         return self.client
 
-    async def transcribe_audio(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
+    async def transcribe_audio(
+        self,
+        audio_data: bytes,
+        language: str = None,
+        filename: Optional[str] = None,
+        content_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Primary method used by the API endpoints.
         """
-        return await self._process_audio_cloud(audio_data, language)
+        return await self._process_audio_cloud(
+            audio_data,
+            language,
+            filename=filename,
+            content_type=content_type,
+        )
+
+    def _suffix_from_meta(self, filename: Optional[str], content_type: Optional[str]) -> str:
+        if filename and "." in filename:
+            ext = os.path.splitext(filename)[1].strip().lower()
+            if ext:
+                return ext
+
+        mime_map = {
+            "audio/webm": ".webm",
+            "audio/mp4": ".mp4",
+            "audio/mpeg": ".mp3",
+            "audio/mp3": ".mp3",
+            "audio/wav": ".wav",
+            "audio/x-wav": ".wav",
+            "audio/ogg": ".ogg",
+        }
+        if content_type:
+            return mime_map.get(content_type.lower(), ".webm")
+        return ".webm"
 
     async def transcribe_and_save(
         self, 
@@ -69,23 +99,45 @@ class WhisperService:
             logger.error(f"Voice Service Error: {str(e)}")
             raise e
 
-    async def _process_audio_cloud(self, audio_data: bytes, language: str = None) -> Dict[str, Any]:
+    async def _process_audio_cloud(
+        self,
+        audio_data: bytes,
+        language: str = None,
+        filename: Optional[str] = None,
+        content_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Standardizes audio and sends it to Gemini Cloud for transcription.
         """
         client = self._get_client()
-        from pydub import AudioSegment
 
-        # Create a temporary file with a proper extension
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            tmp_path = tmp.name
+        tmp_path = None
+        duration_seconds = 0.0
         
         try:
-            # 1. Standardize audio using pydub
-            audio = AudioSegment.from_file(io.BytesIO(audio_data))
-            # Convert to mono, 16kHz for optimal transcription
-            audio = audio.set_frame_rate(16000).set_channels(1)
-            audio.export(tmp_path, format="wav")
+            # Preferred path: normalize audio to 16kHz mono WAV.
+            # Fallback path uploads the raw browser recording when ffmpeg/pydub decoding is unavailable.
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                    tmp_path = tmp.name
+
+                from pydub import AudioSegment
+                audio = AudioSegment.from_file(io.BytesIO(audio_data))
+                audio = audio.set_frame_rate(16000).set_channels(1)
+                audio.export(tmp_path, format="wav")
+                duration_seconds = len(audio) / 1000.0
+            except Exception as decode_error:
+                logger.warning("Audio normalization skipped, using raw upload: %s", decode_error)
+
+                if tmp_path and os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                    tmp_path = None
+
+                raw_suffix = self._suffix_from_meta(filename, content_type)
+                with tempfile.NamedTemporaryFile(delete=False, suffix=raw_suffix) as tmp:
+                    tmp.write(audio_data)
+                    tmp.flush()
+                    tmp_path = tmp.name
 
             # 2. CORRECT V2 SYNTAX: Upload to Gemini via client
             uploaded_file = client.files.upload(path=tmp_path)
@@ -106,11 +158,11 @@ class WhisperService:
             return {
                 "text": response.text.strip(),
                 "language": language if language else "auto",
-                "duration": len(audio) / 1000.0,
+                "duration": duration_seconds,
                 "confidence": 0.95
             }
         finally:
-            if os.path.exists(tmp_path):
+            if tmp_path and os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
 # Singleton initialization

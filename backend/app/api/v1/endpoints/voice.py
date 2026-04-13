@@ -64,7 +64,12 @@ async def transcribe_audio(
             raise HTTPException(status_code=400, detail=error_msg)
             
         # Transcribe via unified voice_service
-        transcription = await voice_service.transcribe_audio(audio_data, language=clean_lang)
+        transcription = await voice_service.transcribe_audio(
+            audio_data,
+            language=clean_lang,
+            filename=file.filename,
+            content_type=file.content_type,
+        )
         
         # Persistence
         final_session_id = session_id or str(uuid.uuid4())
@@ -121,7 +126,12 @@ async def voice_diagnosis(
     
     try:
         audio_data = await audio.read()
-        symptoms_text = await voice_service.transcribe_audio(audio_data, language=language)
+        symptoms_text = await voice_service.transcribe_audio(
+            audio_data,
+            language=language,
+            filename=audio.filename,
+            content_type=audio.content_type,
+        )
         interaction_session_id = str(uuid.uuid4())
         
         # Orchestrate Agent Graph
