@@ -222,9 +222,13 @@ async def voice_diagnosis(
         if final_state.get('urgency_level') == 'EMERGENCY':
             summary = "Emergency Alert: Contact a hospital immediately. " + summary
             
-        # Generate Audio response
-        audio_bytes = await voice_service.generate_speech(summary, language=language)
-        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+        # Generate audio response (best effort). Voice playback failure should not break diagnosis.
+        audio_b64 = None
+        try:
+            audio_bytes = await voice_service.generate_speech(summary, language=language)
+            audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+        except Exception as tts_error:
+            logger.warning("TTS generation skipped for voice diagnosis: %s", tts_error)
         
         return VoiceDiagnosisResponse(
             transcription=symptoms_text,

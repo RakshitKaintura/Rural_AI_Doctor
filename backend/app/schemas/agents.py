@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class VitalSigns(BaseModel):
@@ -45,7 +45,7 @@ class SourceCitation(BaseModel):
 class DiagnosisRequest(BaseModel):
     symptoms: str = Field(..., min_length=5, description="Raw symptoms description from the patient")
     age: Optional[int] = Field(None, ge=0, le=120)
-    gender: Optional[str] = Field(None, pattern="^(Male|Female|Other|Prefer not to say)$")
+    gender: Optional[str] = Field(None)
     medical_history: Optional[str] = Field(None)
     vitals: Optional[VitalSigns] = Field(None)
     image_analysis_id: Optional[int] = Field(None, description="Optional link to pre-processed vision analysis")
@@ -63,6 +63,26 @@ class DiagnosisRequest(BaseModel):
             }
         }
     )
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def normalize_gender(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = str(value).strip().lower()
+        if not normalized:
+            return None
+        allowed = {
+            "male": "Male",
+            "female": "Female",
+            "other": "Other",
+            "prefer not to say": "Prefer not to say",
+            "prefer_not_to_say": "Prefer not to say",
+            "prefer-not-to-say": "Prefer not to say",
+        }
+        if normalized not in allowed:
+            raise ValueError("gender must be one of: Male, Female, Other, Prefer not to say")
+        return allowed[normalized]
 
 
 class DiagnosisResponse(BaseModel):

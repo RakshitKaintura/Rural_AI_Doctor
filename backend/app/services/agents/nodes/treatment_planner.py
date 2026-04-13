@@ -52,10 +52,51 @@ async def treatment_planner_node(state:AgentState)->AgentState:
     - If referral_needed is true, specify the specialty (e.g., Cardiology, Dermatology).
     """
 
-    structured_plan:TreatmentPlan=await gemini_client.generate_structured(
-        prompt=system_prompt,
-        response_model=TreatmentPlan
-    )
+    try:
+        structured_plan: TreatmentPlan = await gemini_client.generate_structured(
+            prompt=system_prompt,
+            response_model=TreatmentPlan
+        )
+    except Exception as llm_err:
+        print(f"Treatment Planner LLM Error: {llm_err}")
+        fallback_plan = TreatmentPlan(
+            immediate_care=[
+                "Rest and stay hydrated.",
+                "Monitor symptoms closely for the next 24 hours.",
+            ],
+            medications=[],
+            non_pharmacological=[
+                "Use supportive home care based on comfort and tolerance.",
+            ],
+            follow_up=FollowUp(
+                timing="Within 24-48 hours or sooner if symptoms worsen",
+                what_to_monitor=["fever", "pain", "breathing difficulty", "worsening weakness"],
+            ),
+            red_flags=[
+                "persistent high fever",
+                "severe chest pain",
+                "difficulty breathing",
+            ],
+            when_to_seek_emergency=[
+                "new confusion",
+                "fainting",
+                "rapidly worsening symptoms",
+            ],
+            lifestyle_advice=["Maintain hydration", "Avoid overexertion until recovery"],
+            referral_needed=False,
+            referral_specialty=None,
+            resource_consideration="Fallback care plan generated because advanced planning service is temporarily unavailable.",
+        )
+
+        return {
+            **state,
+            "treatment_plan": fallback_plan.model_dump(),
+            "next_step": "generate_report",
+            "messages": [{
+                "role": "assistant",
+                "content": "Treatment planner fallback activated. A safe default plan has been generated.",
+            }],
+        }
 
     med_count = len(structured_plan.medications)
     plan_msg = {
