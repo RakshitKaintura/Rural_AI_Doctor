@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,10 @@ export function VoiceDiagnosis() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<VoiceDiagnosisResponse | null>(null);
   const [playingAudio, setPlayingAudio] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackWatchdogRef = useRef<number | null>(null);
 
   const [language, setLanguage] = useState('en');
   const [age, setAge] = useState('');
@@ -33,10 +36,49 @@ export function VoiceDiagnosis() {
   const [medicalHistory, setMedicalHistory] = useState('');
 
   const handleRecordingComplete = (blob: Blob) => {
+    stopAudioPlayback();
     setAudioBlob(blob);
     setError(null);
     setResult(null); // Clear old results when new audio is recorded
   };
+
+  const clearPlaybackWatchdog = () => {
+    if (playbackWatchdogRef.current !== null) {
+      window.clearTimeout(playbackWatchdogRef.current);
+      playbackWatchdogRef.current = null;
+    }
+  };
+
+  const resetPlaybackState = () => {
+    clearPlaybackWatchdog();
+    setPlayingAudio(false);
+    setAudioLoading(false);
+    playbackAudioRef.current = null;
+  };
+
+  const stopAudioPlayback = () => {
+    clearPlaybackWatchdog();
+    const currentAudio = playbackAudioRef.current;
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio.onplay = null;
+      currentAudio.onended = null;
+      currentAudio.onpause = null;
+      currentAudio.onerror = null;
+      currentAudio.onabort = null;
+      currentAudio.onstalled = null;
+      playbackAudioRef.current = null;
+    }
+    setPlayingAudio(false);
+    setAudioLoading(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopAudioPlayback();
+    };
+  }, []);
 
   const handleSubmit = async () => {
     if (!audioBlob) return;
@@ -79,12 +121,45 @@ export function VoiceDiagnosis() {
 
   const playAudioResponse = (base64Data?: string) => {
     const data = base64Data || result?.audio_response;
-    if (!data) return;
+    if (!data) {
+      setError('Audio summary is unavailable for this diagnosis.');
+      return;
+    }
 
+    stopAudioPlayback();
+    setAudioLoading(true);
     const audio = new Audio(`data:audio/mpeg;base64,${data}`);
-    audio.onplay = () => setPlayingAudio(true);
-    audio.onended = () => setPlayingAudio(false);
-    audio.play().catch(e => console.error("Playback blocked:", e));
+    playbackAudioRef.current = audio;
+
+    const onPlaybackFinished = () => {
+      resetPlaybackState();
+    };
+
+    audio.onplay = () => {
+      setAudioLoading(false);
+      setPlayingAudio(true);
+    };
+    audio.onended = onPlaybackFinished;
+    audio.onpause = onPlaybackFinished;
+    audio.onerror = () => {
+      setError('Unable to play the voice summary. Please try again.');
+      onPlaybackFinished();
+    };
+    audio.onabort = onPlaybackFinished;
+    audio.onstalled = onPlaybackFinished;
+
+    // Safety reset if the browser never transitions out of loading/playback.
+    playbackWatchdogRef.current = window.setTimeout(() => {
+      if (playbackAudioRef.current === audio) {
+        onPlaybackFinished();
+      }
+    }, 45000);
+
+    audio.play().catch((e) => {
+      console.error('Playback blocked:', e);
+      setError('Playback is blocked by your browser. Tap again to retry.');
+      onPlaybackFinished();
+    });
   };
 
   return (
@@ -215,12 +290,18 @@ export function VoiceDiagnosis() {
 
             <Button 
                 variant="secondary" 
-                onClick={() => playAudioResponse()} 
-                disabled={playingAudio}
+                onClick={() => {
+                  if (playingAudio || audioLoading) {
+                    stopAudioPlayback();
+                    return;
+                  }
+                  playAudioResponse();
+                }}
+                disabled={!result.audio_response && !playingAudio && !audioLoading}
                 className="w-full h-14 rounded-xl font-bold bg-slate-100 hover:bg-slate-200"
             >
-                {playingAudio ? <Loader2 className="animate-spin mr-2"/> : <Volume2 className="mr-2"/>}
-                Listen to Audio Summary
+                {(playingAudio || audioLoading) ? <Loader2 className="animate-spin mr-2"/> : <Volume2 className="mr-2"/>}
+                {(playingAudio || audioLoading) ? 'Stop Audio Summary' : 'Listen to Audio Summary'}
             </Button>
           </Card>
         </div>
