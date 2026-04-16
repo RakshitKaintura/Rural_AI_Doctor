@@ -15,6 +15,54 @@ The codebase is split into a FastAPI backend and a Next.js frontend, with infras
 - Medication safety checks, audit trails, and clinician override feedback paths
 - Offline-sync oriented APIs for intermittent-connectivity scenarios
 
+## Screenshots
+
+<details>
+  <summary><strong>Welcome + Feature Access</strong></summary>
+  <br />
+  <img src="frontend/public/WelcomePage.png" alt="Welcome page" width="900" />
+  <br />
+  <img src="frontend/public/WelcomePage_EndPoints_Paths.png" alt="Feature access and quick links" width="900" />
+</details>
+
+<details>
+  <summary><strong>User Dashboard + Diagnosis</strong></summary>
+  <br />
+  <img src="frontend/public/User_Dashboard.png" alt="User dashboard" width="900" />
+  <br />
+  <img src="frontend/public/Diagnosis_System.png" alt="Multi-agent diagnosis system" width="900" />
+  <br />
+  <img src="frontend/public/Result_of_Diagnosis.png" alt="Diagnosis result and treatment plan" width="900" />
+</details>
+
+<details>
+  <summary><strong>Knowledge / RAG Assistant</strong></summary>
+  <br />
+  <img src="frontend/public/Knowledge_RAG_Assistant.png" alt="RAG report assistant" width="900" />
+</details>
+
+<details>
+  <summary><strong>Vision / X-Ray Analysis</strong></summary>
+  <br />
+  <img src="frontend/public/Chest_X_Ray_Analysis.png" alt="Chest X-ray analysis" width="900" />
+</details>
+
+<details>
+  <summary><strong>Clinical Ops Console</strong></summary>
+  <br />
+  <img src="frontend/public/Clinical_Ops_Console.png" alt="Clinical operations console" width="900" />
+</details>
+
+<details>
+  <summary><strong>Admin Console + Governance</strong></summary>
+  <br />
+  <img src="frontend/public/Admin_Dashboard.png" alt="Admin dashboard overview" width="900" />
+  <br />
+  <img src="frontend/public/Admin_Dashboard_Audit_Logs.png" alt="Admin audit logs" width="900" />
+  <br />
+  <img src="frontend/public/AdminDashboard_BiasMonitoring.png" alt="Bias monitoring dashboard" width="900" />
+</details>
+
 ## Tech Stack
 
 | Layer | Stack |
