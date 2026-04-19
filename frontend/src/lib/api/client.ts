@@ -17,6 +17,11 @@ const apiClient: AxiosInstance = axios.create({
 // Request Interceptor: Attach Clinical Authentication
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    if (config.data instanceof FormData && config.headers) {
+      delete (config.headers as any)['Content-Type'];
+      delete (config.headers as any)['content-type'];
+    }
+
     // Synchronized with the key used in your project's security utilities
     const token = localStorage.getItem('access_token');
     

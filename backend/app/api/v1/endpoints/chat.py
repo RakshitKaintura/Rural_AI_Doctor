@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.chat import (
     ChatRequest,
@@ -69,6 +70,10 @@ def _parse_json_or_none(value: Optional[str]) -> Any:
         return None
 
 
+def _is_upload_file(value: Any) -> bool:
+    return isinstance(value, (UploadFile, StarletteUploadFile))
+
+
 async def _parse_chat_request(
     raw_request: Request,
 ) -> tuple[ChatRequest, Optional[UploadFile], Optional[UploadFile]]:
@@ -100,8 +105,8 @@ async def _parse_chat_request(
     audio_file = form.get("audio")
     return (
         parsed_request,
-        image_file if isinstance(image_file, UploadFile) else None,
-        audio_file if isinstance(audio_file, UploadFile) else None,
+        image_file if _is_upload_file(image_file) else None,
+        audio_file if _is_upload_file(audio_file) else None,
     )
 
 
@@ -298,6 +303,8 @@ async def chat(
             metadata=metadata,
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
