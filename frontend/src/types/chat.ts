@@ -3,7 +3,13 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  attachments?: MessageAttachment[];
   metadata?: MessageMetadata;
+}
+
+export interface MessageAttachment {
+  type: 'image' | 'audio';
+  name: string;
 }
 
 export interface ChatSession {
@@ -40,4 +46,16 @@ export interface MessageMetadata {
   };
   nearby_facilities?: EmergencyFacility[];
   first_aid_instructions?: string[];
+  input_modalities?: {
+    image?: {
+      filename?: string;
+      image_type?: string;
+      severity?: string;
+      confidence?: number;
+    };
+    audio?: {
+      filename?: string;
+      transcription?: string;
+    };
+  };
 }

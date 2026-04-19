@@ -50,6 +50,15 @@ export function ChatBubble({ message }: ChatBubbleProps) {
             <p className="text-xs font-bold uppercase mb-1">Critical Alert</p>
           )}
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          {isUser && message.attachments && message.attachments.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {message.attachments.map((attachment, index) => (
+                <p key={`${attachment.type}-${attachment.name}-${index}`} className="text-xs text-blue-100">
+                  {attachment.type.toUpperCase()}: {attachment.name}
+                </p>
+              ))}
+            </div>
+          )}
           {isCriticalAssistant && mapsUrl && (
             <div className="mt-3 flex gap-2 flex-wrap">
               <Button asChild size="sm" className="bg-red-600 hover:bg-red-700">

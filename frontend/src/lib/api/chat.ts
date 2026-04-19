@@ -15,6 +15,19 @@ export interface ChatRequest {
   };
 }
 
+export interface ChatInputModalities {
+  image?: {
+    filename?: string;
+    image_type?: string;
+    severity?: string;
+    confidence?: number;
+  };
+  audio?: {
+    filename?: string;
+    transcription?: string;
+  };
+}
+
 export interface ChatResponse {
   message: string;
   session_id: string;
@@ -30,6 +43,7 @@ export interface ChatResponse {
       coordinates: { lat: number; lng: number };
     }>;
     first_aid_instructions?: string[];
+    input_modalities?: ChatInputModalities;
   };
 }
 
@@ -47,7 +61,7 @@ export interface SymptomAnalysisResponse {
 }
 
 export const chatAPI = {
-  sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
+  sendMessage: async (request: ChatRequest | FormData): Promise<ChatResponse> => {
     const response = await apiClient.post('/chat/chat', request);
     return response.data;
   },

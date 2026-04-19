@@ -1,4 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+import json
+import mimetypes
+import uuid
+from datetime import datetime
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.chat import (
     ChatRequest,
@@ -19,8 +25,6 @@ from app.db.models import ChatHistory, AIDecisionAudit
 from app.services.agents.nodes.emergency_action import emergency_action_node
 from app.services.agents.state import AgentState
 from app.core.deps import CurrentUser
-from datetime import datetime
-import uuid
 
 router = APIRouter()
 UNAUTHORIZED_RESPONSE = {
@@ -45,14 +49,72 @@ def _detect_red_flags(text: str) -> list[str]:
     return [keyword for keyword in RED_FLAG_KEYWORDS if keyword in lowered]
 
 
+def _infer_image_type(file: UploadFile) -> str:
+    content_type = file.content_type or ""
+    if "png" in content_type or "jpeg" in content_type or "jpg" in content_type or "webp" in content_type:
+        return "medical_image"
+
+    guessed = mimetypes.guess_type(file.filename or "")[0] or ""
+    if guessed.startswith("image/"):
+        return "medical_image"
+    return "medical_image"
+
+
+def _parse_json_or_none(value: Optional[str]) -> Any:
+    if not value:
+        return None
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return None
+
+
+async def _parse_chat_request(
+    raw_request: Request,
+) -> tuple[ChatRequest, Optional[UploadFile], Optional[UploadFile]]:
+    content_type = raw_request.headers.get("content-type", "").lower()
+
+    if "multipart/form-data" not in content_type:
+        payload = await raw_request.json()
+        return ChatRequest.model_validate(payload), None, None
+
+    form = await raw_request.form()
+    messages_raw = form.get("messages")
+    if isinstance(messages_raw, str):
+        parsed_messages = _parse_json_or_none(messages_raw) or []
+    else:
+        parsed_messages = []
+
+    user_location_raw = form.get("user_location")
+    user_location = _parse_json_or_none(user_location_raw) if isinstance(user_location_raw, str) else None
+
+    payload = {
+        "messages": parsed_messages,
+        "session_id": form.get("session_id"),
+        "system_prompt": form.get("system_prompt"),
+        "user_location": user_location,
+    }
+
+    parsed_request = ChatRequest.model_validate(payload)
+    image_file = form.get("image")
+    audio_file = form.get("audio")
+    return (
+        parsed_request,
+        image_file if isinstance(image_file, UploadFile) else None,
+        audio_file if isinstance(audio_file, UploadFile) else None,
+    )
+
+
 @router.post("/chat", response_model=ChatResponse, responses=UNAUTHORIZED_RESPONSE)
 async def chat(
-    request: ChatRequest,
+    raw_request: Request,
     current_user: CurrentUser,
     db: AsyncSession = Depends(get_db),
 ):
    
     try:
+        request, image_file, audio_file = await _parse_chat_request(raw_request)
+
        
         session_id = request.session_id or str(uuid.uuid4())
         
@@ -60,7 +122,66 @@ async def chat(
         messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
         
       
+        if not messages:
+            raise HTTPException(status_code=422, detail="At least one message is required.")
+
         latest_user_text = messages[-1]["content"] if messages else ""
+        attachment_notes: list[str] = []
+        attachment_metadata: dict[str, Any] = {}
+
+        if audio_file is not None:
+            from app.services.voice.audio_utils import audio_utils
+            from app.services.voice.service import voice_service
+
+            audio_data = await audio_file.read()
+            is_valid_audio, audio_error = audio_utils.validate_audio(audio_data)
+            if not is_valid_audio:
+                raise HTTPException(status_code=400, detail=audio_error or "Invalid audio file.")
+
+            audio_transcription = await voice_service.transcribe_audio(
+                audio_data,
+                filename=audio_file.filename,
+                content_type=audio_file.content_type,
+            )
+            if audio_transcription:
+                attachment_notes.append(f"[Audio transcription]\n{audio_transcription}")
+                attachment_metadata["audio"] = {
+                    "filename": audio_file.filename,
+                    "transcription": audio_transcription,
+                }
+
+        if image_file is not None:
+            from app.services.vision.gemini_vision import gemini_vision
+            from app.services.vision.image_processor import image_processor
+
+            image_data = await image_file.read()
+            is_valid_image, image_error = image_processor.validate_image(image_data)
+            if not is_valid_image:
+                raise HTTPException(status_code=400, detail=image_error or "Invalid image file.")
+
+            image_type = _infer_image_type(image_file)
+            image_analysis = await gemini_vision.analyze_medical_image(
+                image_data=image_data,
+                image_type=image_type,
+                filename=image_file.filename,
+                additional_context=latest_user_text or None,
+            )
+            image_summary = image_analysis.get("findings_summary") or image_analysis.get("full_analysis") or ""
+            if image_summary:
+                attachment_notes.append(f"[Image analysis summary]\n{image_summary}")
+            attachment_metadata["image"] = {
+                "filename": image_file.filename,
+                "image_type": image_type,
+                "severity": image_analysis.get("severity"),
+                "confidence": image_analysis.get("confidence"),
+            }
+
+        if attachment_notes:
+            enriched_text = latest_user_text.strip()
+            notes_text = "\n\n".join(attachment_notes).strip()
+            messages[-1]["content"] = f"{enriched_text}\n\n{notes_text}".strip() if enriched_text else notes_text
+            latest_user_text = messages[-1]["content"]
+
         red_flags = _detect_red_flags(latest_user_text)
         metadata = None
 
@@ -120,6 +241,12 @@ async def chat(
         else:
             system_prompt = request.system_prompt or MEDICAL_SYSTEM_PROMPT
             response_text = await gemini_client.chat(messages, system_prompt)
+
+        if attachment_metadata:
+            metadata = {
+                **(metadata or {}),
+                "input_modalities": attachment_metadata,
+            }
         
         if isinstance(response_text, list):
             # Extract text if response_text is a list of dicts (LangChain behavior for some models)
