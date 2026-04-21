@@ -1,8 +1,8 @@
 import os
 import io
 import logging
-import tempfile
 from google import genai
+from google.genai import types
 from typing import Dict, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import VoiceInteraction
@@ -110,60 +110,58 @@ class WhisperService:
         Standardizes audio and sends it to Gemini Cloud for transcription.
         """
         client = self._get_client()
-
-        tmp_path = None
         duration_seconds = 0.0
+        prepared_audio_data = audio_data
+        prepared_mime_type = content_type or "audio/webm"
         
         try:
             # Preferred path: normalize audio to 16kHz mono WAV.
-            # Fallback path uploads the raw browser recording when ffmpeg/pydub decoding is unavailable.
+            # Fallback path uses the raw browser recording when ffmpeg/pydub decoding is unavailable.
             try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                    tmp_path = tmp.name
-
                 from pydub import AudioSegment
                 audio = AudioSegment.from_file(io.BytesIO(audio_data))
                 audio = audio.set_frame_rate(16000).set_channels(1)
-                audio.export(tmp_path, format="wav")
+                output_buffer = io.BytesIO()
+                audio.export(output_buffer, format="wav")
+                prepared_audio_data = output_buffer.getvalue()
+                prepared_mime_type = "audio/wav"
                 duration_seconds = len(audio) / 1000.0
             except Exception as decode_error:
-                logger.warning("Audio normalization skipped, using raw upload: %s", decode_error)
+                logger.warning("Audio normalization skipped, using raw bytes: %s", decode_error)
+                guessed_suffix = self._suffix_from_meta(filename, content_type)
+                suffix_to_mime = {
+                    ".webm": "audio/webm",
+                    ".mp4": "audio/mp4",
+                    ".mp3": "audio/mpeg",
+                    ".wav": "audio/wav",
+                    ".ogg": "audio/ogg",
+                }
+                prepared_mime_type = suffix_to_mime.get(guessed_suffix, prepared_mime_type)
 
-                if tmp_path and os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-                    tmp_path = None
-
-                raw_suffix = self._suffix_from_meta(filename, content_type)
-                with tempfile.NamedTemporaryFile(delete=False, suffix=raw_suffix) as tmp:
-                    tmp.write(audio_data)
-                    tmp.flush()
-                    tmp_path = tmp.name
-
-            # 2. CORRECT V2 SYNTAX: Upload to Gemini via client
-            uploaded_file = client.files.upload(path=tmp_path)
-            
-            # 3. CORRECT V2 SYNTAX: Generate transcription
             prompt = "Transcribe the following medical audio accurately."
             if language:
                 prompt += f" The expected language is {language}."
                 
             response = client.models.generate_content(
                 model=self.model_id,
-                contents=[prompt, uploaded_file]
+                contents=[
+                    types.Part.from_text(text=prompt),
+                    types.Part.from_bytes(data=prepared_audio_data, mime_type=prepared_mime_type),
+                ],
             )
-            
-            # 4. CORRECT V2 SYNTAX: Clean up file
-            client.files.delete(name=uploaded_file.name)
+            response_text = (response.text or "").strip()
+            if not response_text:
+                raise RuntimeError("Transcription returned empty text.")
 
             return {
-                "text": response.text.strip(),
+                "text": response_text,
                 "language": language if language else "auto",
                 "duration": duration_seconds,
                 "confidence": 0.95
             }
-        finally:
-            if tmp_path and os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        except Exception as exc:
+            logger.error("Cloud transcription failed: %s", exc)
+            raise
 
 # Singleton initialization
 _voice_instance = WhisperService()

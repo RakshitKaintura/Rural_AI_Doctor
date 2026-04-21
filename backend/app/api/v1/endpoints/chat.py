@@ -1,4 +1,5 @@
 import json
+import logging
 import mimetypes
 import uuid
 from datetime import datetime
@@ -28,6 +29,7 @@ from app.services.agents.state import AgentState
 from app.core.deps import CurrentUser
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 UNAUTHORIZED_RESPONSE = {
     401: {
         "description": "Not authenticated. Provide a valid Bearer access token.",
@@ -143,16 +145,26 @@ async def chat(
             if not is_valid_audio:
                 raise HTTPException(status_code=400, detail=audio_error or "Invalid audio file.")
 
-            audio_transcription = await voice_service.transcribe_audio(
-                audio_data,
-                filename=audio_file.filename,
-                content_type=audio_file.content_type,
-            )
-            if audio_transcription:
-                attachment_notes.append(f"[Audio transcription]\n{audio_transcription}")
+            try:
+                audio_transcription = await voice_service.transcribe_audio(
+                    audio_data,
+                    filename=audio_file.filename,
+                    content_type=audio_file.content_type,
+                )
+                if audio_transcription:
+                    attachment_notes.append(f"[Audio transcription]\n{audio_transcription}")
+                    attachment_metadata["audio"] = {
+                        "filename": audio_file.filename,
+                        "transcription": audio_transcription,
+                    }
+            except Exception as transcription_error:
+                logger.warning(
+                    "Audio transcription failed for chat endpoint: %s",
+                    transcription_error,
+                )
                 attachment_metadata["audio"] = {
                     "filename": audio_file.filename,
-                    "transcription": audio_transcription,
+                    "transcription_error": str(transcription_error),
                 }
 
         if image_file is not None:
