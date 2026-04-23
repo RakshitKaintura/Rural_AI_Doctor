@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 
@@ -51,3 +51,45 @@ class VoiceDiagnosisResponse(BaseModel):
     diagnosis_result: Dict[str, Any]
     audio_response: Optional[str] = None  
     urgency_level: str 
+
+
+class LiveVoiceClientEvent(BaseModel):
+    type: Literal[
+        "auth",
+        "session.configure",
+        "turn.start",
+        "turn.audio_chunk",
+        "turn.end",
+        "ping",
+    ]
+    session_id: Optional[str] = None
+    token: Optional[str] = None
+    language: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    medical_history: Optional[str] = None
+    turn_id: Optional[str] = None
+    audio: Optional[str] = None
+    mime_type: Optional[str] = None
+    timestamp: Optional[str] = None
+
+
+class LiveVoiceServerEvent(BaseModel):
+    type: Literal[
+        "auth.ok",
+        "turn.transcript",
+        "turn.response",
+        "turn.audio",
+        "turn.error",
+        "pong",
+    ]
+    session_id: Optional[str] = None
+    turn_id: Optional[str] = None
+    message: Optional[str] = None
+    transcript: Optional[str] = None
+    response_text: Optional[str] = None
+    urgency: Optional[str] = None
+    red_flags: Optional[List[str]] = None
+    audio: Optional[str] = None
+    mime_type: Optional[str] = None
+    timestamp: Optional[str] = None

@@ -23,6 +23,21 @@ const VoiceDiagnosis = dynamic(
   }
 );
 
+const LiveVoiceConsultation = dynamic(
+  () => import('@/components/voice/LiveVoiceConsultation').then(mod => mod.LiveVoiceConsultation),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[220px] w-full flex items-center justify-center bg-slate-50 rounded-3xl border border-slate-100">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+          <p className="text-sm text-slate-500 font-medium">Connecting Live Voice Interface...</p>
+        </div>
+      </div>
+    )
+  }
+);
+
 export default function VoicePage() {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
@@ -59,8 +74,15 @@ export default function VoicePage() {
         </p>
       </header>
 
-      {/* Main Interactive Component - Now SSR-disabled */}
-      <VoiceDiagnosis />
+      <LiveVoiceConsultation />
+
+      <div className="mt-10">
+        <h2 className="text-xl font-bold text-slate-900 mb-3">One-Shot Voice Diagnosis (Legacy)</h2>
+        <p className="text-sm text-slate-500 mb-4">
+          Use this fallback flow if you prefer recording once and receiving a single comprehensive response.
+        </p>
+        <VoiceDiagnosis />
+      </div>
 
       {/* Instructional & Safety Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
