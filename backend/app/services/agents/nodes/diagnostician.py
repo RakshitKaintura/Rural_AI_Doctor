@@ -4,6 +4,7 @@ from app.services.agents.state import AgentState
 from app.services.llm.gemini_client import gemini_client
 from app.services.rag.grounding import retrieve_medical_grounding
 from app.services.rag.reputable_sources import retrieve_reputable_citations
+from app.services.rag.source_catalog import retrieve_catalog_citations
 import asyncio
 
 
@@ -62,11 +63,16 @@ async def diagnostician_node(state: AgentState) -> AgentState:
             f"[Vision Severity]: {vision.get('severity', 'N/A')}\n"
         )
 
-    retrieved_docs, reputable_docs = await asyncio.gather(
+    retrieved_docs, catalog_docs, reputable_docs = await asyncio.gather(
         retrieve_medical_grounding(raw_text, top_k=3),
-        retrieve_reputable_citations(raw_text, top_k=6),
+        retrieve_catalog_citations(raw_text, top_k=3),
+        retrieve_reputable_citations(raw_text, top_k=4),
     )
-    merged_citations = _rank_citations([*(retrieved_docs or []), *(reputable_docs or [])])[:8]
+    merged_citations = _rank_citations([
+        *(catalog_docs or []),
+        *(retrieved_docs or []),
+        *(reputable_docs or []),
+    ])[:8]
 
     if merged_citations:
         rag_text = "\n\n".join(

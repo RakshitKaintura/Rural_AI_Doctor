@@ -18,6 +18,7 @@ from app.db.models import (
     Patient,
     Diagnosis,
     MedicalDocument,
+    MedicalEvidenceSource,
     ChatHistory,
     ImageAnalysis,
     VoiceInteraction,
@@ -25,6 +26,7 @@ from app.db.models import (
     UserActivity,
     UsageMetrics
 )
+from app.services.rag.source_catalog import default_trusted_sources, embed_text
 
 # Professional logging setup
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +56,7 @@ async def init_db() -> None:
         # 3. Seed initial administrative user
         async with AsyncSessionLocal() as session:
             await seed_admin_user(session)
+            await seed_trusted_sources(session)
 
         logger.info("🎉 Database initialization complete!")
 
@@ -87,6 +90,47 @@ async def seed_admin_user(session: AsyncSession) -> None:
         logger.info("✅ Admin user created successfully")
     else:
         logger.info("ℹ️ Admin user already exists; skipping seed")
+
+
+async def seed_trusted_sources(session: AsyncSession) -> None:
+    """Seed a baseline set of trusted clinical references for grounded retrieval."""
+    defaults = default_trusted_sources()
+    inserted = 0
+
+    for item in defaults:
+        existing = await session.execute(
+            select(MedicalEvidenceSource.id).where(
+                MedicalEvidenceSource.provider == item["provider"],
+                MedicalEvidenceSource.title == item["title"],
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            continue
+
+        source_text = f"{item['title']}\n{item['excerpt']}\nTags: {', '.join(item.get('condition_tags', []))}"
+        embedding = await embed_text(source_text, task_type="retrieval_document")
+        session.add(
+            MedicalEvidenceSource(
+                provider=item["provider"],
+                title=item["title"],
+                url=item["url"],
+                excerpt=item["excerpt"],
+                condition_tags=item.get("condition_tags", []),
+                evidence_level=item.get("evidence_level"),
+                published_at=item.get("published_at"),
+                last_verified_at=item.get("last_verified_at") or item.get("published_at"),
+                embedding=embedding,
+                metadata_json={"seeded": True},
+                is_active=True,
+            )
+        )
+        inserted += 1
+
+    if inserted:
+        await session.commit()
+        logger.info(f"✅ Seeded {inserted} trusted medical reference sources")
+    else:
+        logger.info("ℹ️ Trusted medical references already present; skipping seed")
 
 if __name__ == "__main__":
     # Running the initialization in the async event loop

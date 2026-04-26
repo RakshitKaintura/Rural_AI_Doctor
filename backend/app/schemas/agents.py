@@ -40,6 +40,9 @@ class SourceCitation(BaseModel):
     source: Optional[str] = None
     excerpt: str
     similarity: float = 0.0
+    evidence_level: Optional[str] = None
+    published_at: Optional[str] = None
+    last_verified_at: Optional[str] = None
 
 
 class DiagnosisRequest(BaseModel):

@@ -36,12 +36,17 @@ if database_url.startswith("postgresql+asyncpg://"):
     database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
 
     split = urlsplit(database_url)
-    filtered = [
-        (k, v)
-        for k, v in parse_qsl(split.query, keep_blank_values=True)
-        if k not in {"prepared_statement_cache_size", "statement_cache_size"}
-    ]
-    database_url = urlunsplit((split.scheme, split.netloc, split.path, urlencode(filtered), split.fragment))
+    query_items = parse_qsl(split.query, keep_blank_values=True)
+    normalized: list[tuple[str, str]] = []
+    for key, value in query_items:
+        if key in {"prepared_statement_cache_size", "statement_cache_size"}:
+            continue
+        if key == "ssl":
+            normalized.append(("sslmode", value))
+            continue
+        normalized.append((key, value))
+
+    database_url = urlunsplit((split.scheme, split.netloc, split.path, urlencode(normalized), split.fragment))
 
 config.set_main_option("sqlalchemy.url", database_url)
 

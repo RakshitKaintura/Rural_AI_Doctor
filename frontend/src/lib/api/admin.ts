@@ -77,6 +77,32 @@ export interface BiasCheckResponse {
   age_confidence: BiasConfidenceRow[];
 }
 
+export interface TrustedSourceRecord {
+  id: number;
+  provider: string;
+  title: string;
+  url: string;
+  excerpt: string;
+  condition_tags: string[];
+  evidence_level: string | null;
+  published_at: string | null;
+  last_verified_at: string | null;
+  is_active: boolean;
+  created_at: string | null;
+}
+
+export interface TrustedSourceCreatePayload {
+  provider: string;
+  title: string;
+  url: string;
+  excerpt: string;
+  condition_tags?: string[];
+  evidence_level?: string;
+  published_at?: string;
+  last_verified_at?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export const adminAPI = {
   getOverview: async (): Promise<AdminStats> => {
     const response = await apiClient.get('/admin/stats/overview');
@@ -149,5 +175,20 @@ export const adminAPI = {
       params: { count },
     });
     return response.data as { inserted: number; environment: string };
+  },
+
+  listTrustedSources: async () => {
+    const response = await apiClient.get<TrustedSourceRecord[]>('/rag/sources');
+    return response.data;
+  },
+
+  createTrustedSource: async (payload: TrustedSourceCreatePayload) => {
+    const response = await apiClient.post<TrustedSourceRecord>('/rag/sources', payload);
+    return response.data;
+  },
+
+  seedDefaultTrustedSources: async () => {
+    const response = await apiClient.post('/rag/sources/seed-defaults');
+    return response.data as { inserted: number; skipped_existing: number };
   },
 };

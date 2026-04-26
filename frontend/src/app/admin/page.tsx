@@ -1,6 +1,7 @@
 'use client';
 
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
+import { TrustedSourcesManager } from '@/components/admin/TrustedSourcesManager';
 import { AuditLogTable } from '@/components/admin/audit/AuditLogTable';
 import { BiasMonitor } from '@/components/admin/audit/BiasMonitor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,6 +34,7 @@ export default function AdminPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="audit-logs">AI Audit Logs</TabsTrigger>
           <TabsTrigger value="bias-monitoring">Bias Monitoring</TabsTrigger>
+          <TabsTrigger value="trusted-sources">Trusted Sources</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -45,6 +47,10 @@ export default function AdminPage() {
 
         <TabsContent value="bias-monitoring">
           <BiasMonitor />
+        </TabsContent>
+
+        <TabsContent value="trusted-sources">
+          <TrustedSourcesManager />
         </TabsContent>
       </Tabs>
     </div>

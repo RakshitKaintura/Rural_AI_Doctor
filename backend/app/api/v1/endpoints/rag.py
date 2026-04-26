@@ -11,12 +11,21 @@ from sqlalchemy import String, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.deps import get_current_active_user
-from app.db.models import MedicalDocument, User
+from app.core.deps import get_current_active_user, get_current_admin_user
+from app.db.models import MedicalDocument, MedicalEvidenceSource, User
 from app.db.session import get_db
-from app.schemas.rag import RagCitation, RagQueryRequest, RagQueryResponse, RagUploadResponse
+from app.schemas.rag import (
+    RagCitation,
+    RagQueryRequest,
+    RagQueryResponse,
+    RagUploadResponse,
+    TrustedSourceCreateRequest,
+    TrustedSourceResponse,
+    TrustedSourceSeedResponse,
+)
 from app.services.llm.gemini_client import gemini_client
 from app.services.rag.reputable_sources import retrieve_reputable_citations
+from app.services.rag.source_catalog import default_trusted_sources, embed_text, retrieve_catalog_citations
 
 
 router = APIRouter()
@@ -267,16 +276,25 @@ async def query_uploaded_reports(
                 }
             )
 
+    catalog_citation_dicts: list[dict[str, Any]] = []
     reputable_citation_dicts: list[dict[str, Any]] = []
     try:
-        reputable_citation_dicts = await retrieve_reputable_citations(
-            request.question,
-            top_k=min(3, request.top_k),
+        catalog_citation_dicts, reputable_citation_dicts = await asyncio.gather(
+            retrieve_catalog_citations(request.question, top_k=min(3, request.top_k)),
+            retrieve_reputable_citations(
+                request.question,
+                top_k=min(2, request.top_k),
+            ),
         )
     except Exception:
+        catalog_citation_dicts = []
         reputable_citation_dicts = []
 
-    merged_ranked = _rank_citation_dicts([*local_citation_dicts, *reputable_citation_dicts])[: request.top_k]
+    merged_ranked = _rank_citation_dicts([
+        *local_citation_dicts,
+        *catalog_citation_dicts,
+        *reputable_citation_dicts,
+    ])[: request.top_k]
 
     citations: list[RagCitation] = []
     context_blocks: list[str] = []
@@ -297,6 +315,11 @@ async def query_uploaded_reports(
                 title=title,
                 source=source,
                 excerpt=excerpt,
+                provider=provider,
+                similarity=float(citation.get("similarity", 0.0) or 0.0),
+                evidence_level=citation.get("evidence_level"),
+                published_at=citation.get("published_at"),
+                last_verified_at=citation.get("last_verified_at"),
             )
         )
 
@@ -337,3 +360,133 @@ async def query_uploaded_reports(
         citations = []
 
     return RagQueryResponse(answer=str(answer), matched_chunks=len(citations), citations=citations)
+
+
+@router.post(
+    "/sources",
+    response_model=TrustedSourceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add curated medical reference source (admin only)",
+)
+async def create_trusted_source(
+    request: TrustedSourceCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+):
+    del current_admin
+
+    source_text = f"{request.title}\n{request.excerpt}\nTags: {', '.join(request.condition_tags)}"
+    embedding = await embed_text(source_text, task_type="retrieval_document")
+
+    row = MedicalEvidenceSource(
+        provider=request.provider.strip(),
+        title=request.title.strip(),
+        url=str(request.url),
+        excerpt=request.excerpt.strip(),
+        condition_tags=request.condition_tags,
+        evidence_level=request.evidence_level,
+        published_at=request.published_at,
+        last_verified_at=request.last_verified_at,
+        embedding=embedding,
+        metadata_json=request.metadata,
+        is_active=True,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+
+    return TrustedSourceResponse(
+        id=row.id,
+        provider=row.provider,
+        title=row.title,
+        url=row.url,
+        excerpt=row.excerpt,
+        condition_tags=row.condition_tags or [],
+        evidence_level=row.evidence_level,
+        published_at=row.published_at.isoformat() if row.published_at else None,
+        last_verified_at=row.last_verified_at.isoformat() if row.last_verified_at else None,
+        is_active=bool(row.is_active),
+        created_at=row.created_at.isoformat() if row.created_at else None,
+    )
+
+
+@router.get(
+    "/sources",
+    response_model=List[TrustedSourceResponse],
+    summary="List curated medical reference sources",
+)
+async def list_trusted_sources(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    del current_user
+    result = await db.execute(
+        select(MedicalEvidenceSource)
+        .where(MedicalEvidenceSource.is_active.is_(True))
+        .order_by(MedicalEvidenceSource.provider.asc(), MedicalEvidenceSource.id.asc())
+    )
+    rows = result.scalars().all()
+    return [
+        TrustedSourceResponse(
+            id=row.id,
+            provider=row.provider,
+            title=row.title,
+            url=row.url,
+            excerpt=row.excerpt,
+            condition_tags=row.condition_tags or [],
+            evidence_level=row.evidence_level,
+            published_at=row.published_at.isoformat() if row.published_at else None,
+            last_verified_at=row.last_verified_at.isoformat() if row.last_verified_at else None,
+            is_active=bool(row.is_active),
+            created_at=row.created_at.isoformat() if row.created_at else None,
+        )
+        for row in rows
+    ]
+
+
+@router.post(
+    "/sources/seed-defaults",
+    response_model=TrustedSourceSeedResponse,
+    summary="Seed trusted baseline references (admin only)",
+)
+async def seed_default_trusted_sources(
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+):
+    del current_admin
+
+    defaults = default_trusted_sources()
+    inserted = 0
+    skipped = 0
+    for item in defaults:
+        existing = await db.execute(
+            select(MedicalEvidenceSource.id).where(
+                MedicalEvidenceSource.provider == item["provider"],
+                MedicalEvidenceSource.title == item["title"],
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            skipped += 1
+            continue
+
+        source_text = f"{item['title']}\n{item['excerpt']}\nTags: {', '.join(item.get('condition_tags', []))}"
+        embedding = await embed_text(source_text, task_type="retrieval_document")
+        db.add(
+            MedicalEvidenceSource(
+                provider=item["provider"],
+                title=item["title"],
+                url=item["url"],
+                excerpt=item["excerpt"],
+                condition_tags=item.get("condition_tags", []),
+                evidence_level=item.get("evidence_level"),
+                published_at=item.get("published_at"),
+                last_verified_at=item.get("last_verified_at") or item.get("published_at"),
+                embedding=embedding,
+                metadata_json={"seeded": True},
+                is_active=True,
+            )
+        )
+        inserted += 1
+
+    await db.commit()
+    return TrustedSourceSeedResponse(inserted=inserted, skipped_existing=skipped)

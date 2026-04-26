@@ -150,7 +150,7 @@ export function LiveVoiceConsultation() {
 
       <Card className="p-6 border-slate-100 shadow-sm">
         <h4 className="font-semibold text-slate-900 mb-4">Conversation</h4>
-        <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+        <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
           {messages.length === 0 && (
             <p className="text-sm text-slate-500">Start live consultation and hold the mic button to speak.</p>
           )}

@@ -11,9 +11,20 @@ The codebase is split into a FastAPI backend and a Next.js frontend, with infras
 - Voice consultation features for transcription, speech output, and spoken diagnosis flows
 - Vision workflows for image and X-ray analysis
 - RAG workspace for searching indexed medical documents and knowledge sources
+- Trusted source catalog (WHO/CDC/NICE + curated references) with citation metadata
 - Follow-up planning, appointment scheduling, export tooling, and clinical ops screens
 - Medication safety checks, audit trails, and clinician override feedback paths
 - Offline-sync oriented APIs for intermittent-connectivity scenarios
+
+## Evidence Grounding
+
+Medical answers are grounded through a multi-layer retrieval strategy before generation:
+
+- Curated trusted source catalog in PostgreSQL (`medical_evidence_sources`)
+- Local uploaded knowledge base chunks (`medical_documents` + pgvector)
+- Reputable public sources (PubMed, MedlinePlus, OpenFDA, ClinicalTrials)
+
+Every diagnosis and RAG response can include citation metadata (provider, source URL, excerpt, similarity, evidence level, and verification timestamps) for auditability.
 
 ## Screenshots
 
@@ -248,6 +259,15 @@ Additional scripts:
 - `npm run build`
 - `npm run test:coverage`
 - `npm run test:watch`
+- `npm run test:e2e`
+- `npm run test:e2e:ui`
+
+Run once before the first E2E execution:
+
+```bash
+cd frontend
+npx playwright install chromium
+```
 
 ## Project Structure
 

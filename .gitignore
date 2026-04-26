@@ -66,6 +66,8 @@ desktop.ini
 coverage/
 .nyc_output/
 backend/tests/assets/temp_*
+frontend/playwright-report/
+frontend/test-results/
 
 # --- Logs ---
 *.log

@@ -81,6 +81,25 @@ class MedicalDocument(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class MedicalEvidenceSource(Base):
+    __tablename__ = "medical_evidence_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    provider = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    excerpt = Column(Text, nullable=False)
+    condition_tags = Column(JSON, nullable=True)
+    evidence_level = Column(String, nullable=True)  # guideline, systematic_review, rct, observational, expert_consensus
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    last_verified_at = Column(DateTime(timezone=True), nullable=True)
+    embedding = Column(Vector(768))
+    metadata_json = Column("metadata", JSON, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
 class ChatHistory(Base):
     __tablename__ = "chat_history"
 

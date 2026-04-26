@@ -13,7 +13,7 @@ const VoiceDiagnosis = dynamic(
   { 
     ssr: false,
     loading: () => (
-      <div className="h-[400px] w-full flex items-center justify-center bg-slate-50 rounded-3xl border border-slate-100">
+      <div className="h-100 w-full flex items-center justify-center bg-slate-50 rounded-3xl border border-slate-100">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           <p className="text-sm text-slate-500 font-medium">Loading Clinical Interface...</p>
@@ -28,7 +28,7 @@ const LiveVoiceConsultation = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[220px] w-full flex items-center justify-center bg-slate-50 rounded-3xl border border-slate-100">
+      <div className="h-55 w-full flex items-center justify-center bg-slate-50 rounded-3xl border border-slate-100">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
           <p className="text-sm text-slate-500 font-medium">Connecting Live Voice Interface...</p>
