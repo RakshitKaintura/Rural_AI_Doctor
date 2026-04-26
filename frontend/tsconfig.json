@@ -1,7 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "target": "ESNext",
     "lib": [
       "dom",
@@ -28,11 +26,14 @@
       "@/*": [
         "./src/*"
       ],
+      "lib/*": [
+        "./lib/*"
+      ],
       "ai/react": [
-        "node_modules/ai/react/dist/index.d.ts"
+        "./node_modules/ai/react/dist/index.d.ts"
       ],
       "@ai-sdk/react": [
-        "node_modules/@ai-sdk/react/dist/index.d.ts"
+        "./node_modules/@ai-sdk/react/dist/index.d.ts"
       ]
     }
   },
