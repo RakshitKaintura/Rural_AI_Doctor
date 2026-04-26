@@ -6,8 +6,6 @@ import { useRouter } from 'next/navigation';
 import { ShieldCheck, Zap, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/authContext';
 
-// FIX: Dynamically import the component and disable SSR.
-// This prevents the "Hydration Mismatch" error by ensuring it only loads in the browser.
 const VoiceDiagnosis = dynamic(
   () => import('@/components/voice/VoiceDiagnosis').then(mod => mod.VoiceDiagnosis),
   { 
