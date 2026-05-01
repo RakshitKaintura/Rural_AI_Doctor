@@ -1,317 +1,193 @@
-# Rural AI Doctor
+# 🏥 Rural AI Doctor
 
-Rural AI Doctor is an AI-assisted healthcare platform built for rural and low-resource clinical environments. It combines conversational triage, multi-step diagnosis support, voice and image workflows, retrieval-augmented medical knowledge, auditability, and operational tooling in a full-stack web application.
+**Rural AI Doctor** is an advanced, AI-assisted healthcare platform engineered specifically for rural and low-resource clinical environments. It brings together conversational triage, multi-step diagnosis support, voice and image workflows, retrieval-augmented medical knowledge, auditability, and operational tooling into a single, cohesive full-stack web application.
 
-The codebase is split into a FastAPI backend and a Next.js frontend, with infrastructure choices aimed at practical deployment: PostgreSQL with `pgvector`, structured logging, rate limiting, health checks, observability hooks, and modular API services.
+The codebase features a robust **FastAPI backend** and a modern **Next.js frontend**. The infrastructure is built for practical, real-world deployment with technologies like PostgreSQL with `pgvector`, structured logging, rate limiting, comprehensive health checks, observability hooks, and highly modular API services.
 
-## Highlights
+---
 
-- AI chat and symptom triage workflows for guided first-pass assessment
-- Multi-agent diagnosis support with treatment planning and report generation
-- Voice consultation features for transcription, speech output, and spoken diagnosis flows
-- Vision workflows for image and X-ray analysis
-- RAG workspace for searching indexed medical documents and knowledge sources
-- Trusted source catalog (WHO/CDC/NICE + curated references) with citation metadata
-- Follow-up planning, appointment scheduling, export tooling, and clinical ops screens
-- Medication safety checks, audit trails, and clinician override feedback paths
-- Offline-sync oriented APIs for intermittent-connectivity scenarios
+## ✨ Core Highlights & Features
 
-## Evidence Grounding
+- 💬 **Conversational Triage:** AI-driven chat and symptom triage workflows for guided, accurate first-pass patient assessments.
+- 🩺 **Multi-Agent Diagnosis:** Advanced diagnosis support including treatment planning, emergency action nodes, and comprehensive report generation.
+- 🎙️ **Live Voice Consultations:** Real-time, live sessions where users can talk directly to the AI doctor, featuring seamless transcription, speech output, and spoken diagnosis flows for maximum accessibility.
+- 🩻 **Vision Workflows:** Cutting-edge image and chest X-ray analysis integration.
+- 📚 **RAG Medical Workspace:** Retrieval-Augmented Generation workspace for searching indexed medical documents and internal knowledge sources.
+- 🏛️ **Evidence Grounding:** Trusted source catalog (WHO, CDC, NICE + curated references) with deep citation metadata for every generated response.
+- 📅 **Clinical Operations:** Follow-up planning, appointment scheduling, export tooling, offline-sync endpoints, and clinical ops screens.
+- 🛡️ **Safety & Governance:** Medication safety checks, comprehensive audit trails, and clinician override feedback paths.
 
-Medical answers are grounded through a multi-layer retrieval strategy before generation:
+---
 
-- Curated trusted source catalog in PostgreSQL (`medical_evidence_sources`)
-- Local uploaded knowledge base chunks (`medical_documents` + pgvector)
-- Reputable public sources (PubMed, MedlinePlus, OpenFDA, ClinicalTrials)
+## 🔍 Evidence Grounding Architecture
 
-Every diagnosis and RAG response can include citation metadata (provider, source URL, excerpt, similarity, evidence level, and verification timestamps) for auditability.
+Medical answers are strictly grounded through a multi-layer retrieval strategy before generation:
 
-## Screenshots
+1. **Trusted Source Catalog:** Stored in PostgreSQL (`medical_evidence_sources`).
+2. **Local Knowledge Base:** Uploaded medical documents chunked using `pgvector` (`medical_documents`).
+3. **Reputable Public Sources:** Integration with PubMed, MedlinePlus, OpenFDA, and ClinicalTrials.
 
-### Welcome + Feature Access
+Every diagnosis and RAG response includes detailed citation metadata: **Provider, Source URL, Excerpt, Similarity Score, Evidence Level, and Verification Timestamps** to ensure complete auditability.
 
-<img src="frontend/public/WelcomePage.png" alt="Welcome page" width="900" />
+---
 
-<img src="frontend/public/WelcomePage_EndPoints_Paths.png" alt="Feature access and quick links" width="900" />
+## 📸 Product Screenshots
 
-### User Dashboard + Diagnosis
+### 🏠 Welcome + Feature Access
+![Welcome page](frontend/public/WelcomePage.png)
+![Feature access and quick links](frontend/public/WelcomePage_EndPoints_Paths.png)
 
-<img src="frontend/public/User_Dashboard.png" alt="User dashboard" width="900" />
+### 🏥 User Dashboard + Diagnosis
+![User dashboard](frontend/public/User_Dashboard.png)
+![Multi-agent diagnosis system](frontend/public/Diagnosis_System.png)
+![Diagnosis result and treatment plan](frontend/public/Result_of_Diagnosis.png)
 
-<img src="frontend/public/Diagnosis_System.png" alt="Multi-agent diagnosis system" width="900" />
+### 🧠 Knowledge / RAG Assistant
+![RAG report assistant](frontend/public/Knowledge_RAG_Assistant.png)
 
-<img src="frontend/public/Result_of_Diagnosis.png" alt="Diagnosis result and treatment plan" width="900" />
+### 🩻 Vision / X-Ray Analysis
+![Chest X-ray analysis](frontend/public/Chest_X_Ray_Analysis.png)
 
-### Knowledge / RAG Assistant
+### ⚙️ Clinical Ops Console & Admin Governance
+![Clinical operations console](frontend/public/Clinical_Ops_Console.png)
+![Admin dashboard overview](frontend/public/Admin_Dashboard.png)
+![Admin audit logs](frontend/public/Admin_Dashboard_Audit_Logs.png)
+![Bias monitoring dashboard](frontend/public/AdminDashboard_BiasMonitoring.png)
 
-<img src="frontend/public/Knowledge_RAG_Assistant.png" alt="RAG report assistant" width="900" />
+---
 
-### Vision / X-Ray Analysis
-
-<img src="frontend/public/Chest_X_Ray_Analysis.png" alt="Chest X-ray analysis" width="900" />
-
-### Clinical Ops Console
-
-<img src="frontend/public/Clinical_Ops_Console.png" alt="Clinical operations console" width="900" />
-
-### Admin Console + Governance
-
-<img src="frontend/public/Admin_Dashboard.png" alt="Admin dashboard overview" width="900" />
-
-<img src="frontend/public/Admin_Dashboard_Audit_Logs.png" alt="Admin audit logs" width="900" />
-
-<img src="frontend/public/AdminDashboard_BiasMonitoring.png" alt="Bias monitoring dashboard" width="900" />
-
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Stack |
 | --- | --- |
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS, Radix UI, Zustand, React Query |
-| Backend | FastAPI, SQLAlchemy, Pydantic Settings, Uvicorn, Gunicorn |
-| Data | PostgreSQL, `pgvector`, Alembic, Redis-compatible cache configuration |
-| AI | Google Gemini, LangChain, LangGraph, LangSmith |
-| Media | OpenCV, Pillow, PyMuPDF, pydub, gTTS, ElevenLabs |
-| Observability | Prometheus instrumentation, structured logging, Sentry |
-| Testing | Pytest, Jest, Testing Library |
+| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS, Radix UI, Zustand, React Query |
+| **Backend** | FastAPI, SQLAlchemy, Pydantic Settings, Uvicorn, Gunicorn |
+| **Data** | PostgreSQL, `pgvector`, Alembic, Redis-compatible cache configuration |
+| **AI Layer** | Google Gemini, LangChain, LangGraph, LangSmith |
+| **Media / Vision**| OpenCV, Pillow, PyMuPDF, pydub, gTTS, ElevenLabs |
+| **Observability** | Prometheus instrumentation, structured logging, Sentry |
+| **Testing** | Pytest, Jest, React Testing Library |
 
-## Core Product Areas
+---
 
-### Clinical Decision Support
+## 🏗️ Project Architecture
 
-- Symptom intake and AI-assisted triage
-- Escalation handling for urgent or emergency cases
-- Diagnosis support with treatment and emergency action nodes
+```text
+Rural_AI_Doctor/
+├── backend/
+│   ├── alembic/         # Database migrations
+│   ├── app/
+│   │   ├── api/         # FastAPI Route handlers
+│   │   ├── core/        # Config, Security, and Setup
+│   │   ├── db/          # SQLAlchemy Models & Engine
+│   │   ├── schemas/     # Pydantic Schemas
+│   │   └── services/    # Business logic (AI, Voice, Vision, RAG)
+│   ├── scripts/         # Init & DB scripts
+│   └── tests/           # Backend API and workflow coverage
+├── frontend/
+│   ├── public/          # Assets and images
+│   └── src/
+│       ├── app/         # Next.js App Router pages
+│       ├── components/  # Feature-specific UI modules
+│       ├── hooks/       # React hooks
+│       ├── lib/         # API wrappers & Auth
+│       └── store/       # Zustand state management
+├── docs/                # Architecture and design documentation
+└── scripts/             # Global utility scripts
+```
 
-### Rural-Care Workflow Support
+---
 
-- Follow-up scheduling and status tracking
-- Appointment management
-- Offline sync endpoints for delayed connectivity environments
-
-### Multimodal Care Interfaces
-
-- Voice consultation and transcription endpoints
-- X-ray and image analysis workflows
-- Knowledge retrieval over uploaded or indexed medical content
-
-### Governance and Operations
-
-- Audit logs for AI decisions
-- Feedback and override capture for clinician review
-- Admin, backup, export, and reporting endpoints
-
-## Architecture
-
-### Frontend
-
-The frontend lives in [`frontend`](./frontend) and provides the clinical workspace. The main application includes routes for chat, diagnosis, voice consultation, X-ray analysis, RAG, dashboard history, appointments, export, admin, and clinical ops.
-
-Key frontend areas:
-
-- `src/app`: App Router pages and layouts
-- `src/components`: feature-specific UI modules
-- `src/lib/api`: backend client helpers and API wrappers
-- `src/lib/auth`: authentication context
-- `src/store`: lightweight state management
-
-### Backend
-
-The backend lives in [`backend`](./backend) and exposes a versioned REST API under `/api/v1`.
-
-Key backend areas:
-
-- `app/api/v1/endpoints`: route handlers by feature area
-- `app/services`: business logic for AI, voice, vision, RAG, export, backup, email, and notifications
-- `app/db`: SQLAlchemy engine, session, and models
-- `app/schemas`: request and response contracts
-- `alembic`: database migrations
-- `tests`: backend API and workflow coverage
-
-## API Surface
-
-The backend currently includes routers for:
-
-- `auth`
-- `users`
-- `reports`
-- `admin`
-- `export`
-- `appointments`
-- `backup`
-- `rag`
-- `chat`
-- `vision`
-- `agents`
-- `voice`
-- `triage`
-- `followups`
-- `medications`
-- `sync`
-- `audit`
-- `health`
-
-When `DEBUG=true`, interactive docs are available at `/docs` and `/redoc`.
-
-## Local Development
+## 🚀 Local Development Guide
 
 ### Prerequisites
-
 - Python 3.11+
 - Node.js 20+
 - PostgreSQL 16 with `pgvector`
 - npm
 
-### 1. Start the database
-
-From the `backend` folder, a local Docker setup is available for PostgreSQL:
-
+### 1. Database Setup
+A local Docker setup is provided for PostgreSQL:
 ```bash
 cd backend
 docker-compose up -d
 ```
+> Exposes PostgreSQL on `localhost:5434` with a database named `rural_ai_doctor`.
 
-This exposes PostgreSQL on `localhost:5434` with a default database named `rural_ai_doctor`.
-
-### 2. Configure backend environment
-
-Create a local environment file from the example:
-
+### 2. Environment Variables
 ```bash
 cd backend
 copy .env.example .env
 ```
+Ensure you update variables like `DATABASE_URL`, `SECRET_KEY`, `GOOGLE_API_KEY`, `OPENFDA_API_KEY`, etc.
 
-Update values such as:
-
-- `DATABASE_URL`
-- `SECRET_KEY`
-- `GOOGLE_API_KEY`
-- `OPENFDA_API_KEY`
-- `LANGCHAIN_API_KEY`
-- `SENTRY_DSN` if you want error tracking locally
-
-### 3. Install backend dependencies
-
+### 3. Backend Setup
 ```bash
 cd backend
 python -m venv .venv
+# Windows:
 .venv\Scripts\activate
+# macOS/Linux:
+# source .venv/bin/activate
+
 pip install -r requirements.txt
 ```
 
-### 4. Initialize the database
-
-You can either run migrations:
-
+### 4. Initialize Database
+Sync the schema, enable `pgvector`, and seed the admin account:
 ```bash
-cd backend
-alembic upgrade head
-```
-
-Or use the project initialization script, which syncs schema, enables `pgvector`, and seeds a default admin account for local use:
-
-```bash
-cd backend
 python scripts/init_db.py
 ```
 
-### 5. Run the backend API
+### 5. Run the Services
 
+**Backend API:**
 ```bash
 cd backend
 uvicorn app.main:app --reload
 ```
+> Available at `http://127.0.0.1:8000`. API Docs at `/docs`.
 
-The API will be available at `http://127.0.0.1:8000`.
-
-### 6. Install and run the frontend
-
+**Frontend Application:**
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+> Available at `http://localhost:3000`.
 
-The frontend will be available at `http://localhost:3000`.
+---
 
-By default, the frontend resolves the API base URL to `http://127.0.0.1:8000/api/v1` in local development. You can override this with `NEXT_PUBLIC_API_URL`.
+## 🧪 Testing
 
-## Testing
-
-### Backend
-
+**Backend:**
 ```bash
 cd backend
 pytest
 ```
+*Coverage includes clinical triage, medication safety, sync conflict handling, and audit paths.*
 
-Workflow coverage includes clinical triage, follow-up transitions, medication safety, sync conflict handling, and audit feedback paths.
-
-### Frontend
-
+**Frontend:**
 ```bash
 cd frontend
 npm test
+npm run test:e2e
 ```
+*Run `npx playwright install chromium` once before E2E tests.*
 
-Additional scripts:
+---
 
-- `npm run build`
-- `npm run test:coverage`
-- `npm run test:watch`
-- `npm run test:e2e`
-- `npm run test:e2e:ui`
+## ⚠️ Safety & Compliance Note
 
-Run once before the first E2E execution:
+This project is a **clinical decision-support application** and is **NOT** a replacement for licensed medical judgment. Any real-world deployment must undergo rigorous clinical validation, privacy/security review (HIPAA/GDPR), and incorporate appropriate regulatory and operational safeguards.
 
-```bash
-cd frontend
-npx playwright install chromium
-```
+---
 
-## Project Structure
+## 🌟 Resume / Portfolio Value
 
-```text
-Rural_AI_Doctor/
-|-- backend/
-|   |-- app/
-|   |   |-- api/
-|   |   |-- core/
-|   |   |-- db/
-|   |   |-- schemas/
-|   |   `-- services/
-|   |-- alembic/
-|   |-- scripts/
-|   `-- tests/
-|-- frontend/
-|   |-- src/
-|   |   |-- app/
-|   |   |-- components/
-|   |   |-- hooks/
-|   |   |-- lib/
-|   |   `-- store/
-|   `-- public/
-|-- docs/
-`-- scripts/
-```
-
-## Deployment Notes
-
-- The frontend includes `vercel.json`, indicating Vercel-oriented deployment.
-- The backend includes `Procfile`, `runtime.txt`, and production middleware suitable for Render-style deployment.
-- Health endpoints are exposed at `/health` and `/health/detailed`.
-- Metrics are exposed through Prometheus instrumentation.
-
-## Safety Note
-
-This project is a clinical decision-support application, not a replacement for licensed medical judgment. Any real-world deployment should include clinical validation, privacy/security review, and appropriate regulatory and operational safeguards.
-
-## Resume / Portfolio Value
-
-This project demonstrates:
-
-- full-stack product engineering across frontend, backend, and data layers
-- production-style API design and observability
-- applied AI integration beyond simple chat interfaces
-- healthcare workflow thinking, including auditability and safety controls
-- multimodal UX design spanning text, voice, documents, and imaging
+This project actively demonstrates:
+- **Full-stack product engineering** across modern frontend, backend, and data layers.
+- **Production-grade API design** with integrated observability, caching, and rate limiting.
+- **Applied AI integration** moving far beyond simple chat interfaces into multi-agent workflows.
+- **Healthcare domain modeling** with strict auditability, grounding, and safety controls.
+- **Multimodal UX design** effortlessly blending text, voice, documents, and medical imaging.

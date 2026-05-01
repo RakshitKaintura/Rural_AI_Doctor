@@ -19,6 +19,7 @@ from app.core.security import decode_access_token
 from app.db.models import AIDecisionAudit, ChatHistory, Diagnosis, Patient, User, VoiceInteraction
 from app.db.session import AsyncSessionLocal, get_db
 from app.schemas.voice import TranscriptionResponse, TTSRequest, VoiceDiagnosisResponse
+from app.services.agents.graph import get_medical_agent_graph
 from app.services.llm.gemini_client import gemini_client
 from app.services.llm.prompts import MEDICAL_SYSTEM_PROMPT
 from app.services.voice.audio_utils import audio_utils
@@ -33,67 +34,7 @@ UNAUTHORIZED_RESPONSE = {
 }
 
 
-class _MedicalAgentGraphShim:
-    """Test-friendly shim. Keeps the same monkeypatch target used by existing tests."""
-
-    async def ainvoke(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        symptoms = str(state.get("symptoms") or "").lower()
-        red_flags = [
-            "chest pain",
-            "difficulty breathing",
-            "shortness of breath",
-            "unconscious",
-            "seizure",
-            "severe bleeding",
-            "stroke",
-        ]
-        urgent_flags = ["high fever", "dehydration", "severe pain", "vomiting"]
-
-        if any(flag in symptoms for flag in red_flags):
-            urgency = "EMERGENCY"
-            diagnosis_name = "Possible severe acute condition"
-            confidence = 0.85
-            immediate_care = [
-                "Seek emergency care immediately.",
-                "Do not delay transport to the nearest hospital.",
-                "Keep the patient monitored until help arrives.",
-            ]
-        elif any(flag in symptoms for flag in urgent_flags):
-            urgency = "URGENT"
-            diagnosis_name = "Possible acute infection or inflammatory illness"
-            confidence = 0.78
-            immediate_care = [
-                "Arrange same-day clinical evaluation.",
-                "Ensure hydration and rest.",
-                "Monitor worsening symptoms closely.",
-            ]
-        else:
-            urgency = "ROUTINE"
-            diagnosis_name = "Likely mild upper respiratory illness"
-            confidence = 0.72
-            immediate_care = [
-                "Rest and drink fluids.",
-                "Use symptomatic care as advised by a clinician.",
-                "Follow up if symptoms persist or worsen.",
-            ]
-
-        report = (
-            f"Symptoms summary: {state.get('symptoms', '')}\n"
-            f"Suggested diagnosis: {diagnosis_name}\n"
-            f"Urgency: {urgency}\n"
-            "This is an AI-assisted preliminary assessment and not a final medical diagnosis."
-        )
-
-        return {
-            "diagnosis": {"primary_diagnosis": diagnosis_name},
-            "urgency_level": urgency,
-            "confidence": confidence,
-            "treatment_plan": {"immediate_care": immediate_care},
-            "final_report": report,
-        }
-
-
-medical_agent_graph = _MedicalAgentGraphShim()
+medical_agent_graph = get_medical_agent_graph()
 
 RED_FLAG_KEYWORDS = [
     "chest pain",
@@ -554,10 +495,28 @@ async def voice_diagnosis(
             symptoms_text = "Voice received but transcription was unavailable."
 
         state = {
+            "patient_id": None,
             "symptoms": symptoms_text,
+            "user_location": None,
             "age": age,
             "gender": gender,
             "medical_history": medical_history,
+            "vitals": None,
+            "has_image": False,
+            "image_type": None,
+            "image_analysis": None,
+            "urgency_level": "ROUTINE",
+            "messages": [],
+            "confidence": 0.0,
+            "triage_result": None,
+            "symptom_analysis": None,
+            "rag_context": None,
+            "diagnosis": None,
+            "treatment_plan": None,
+            "is_emergency": False,
+            "emergency_info": None,
+            "next_step": None,
+            "final_report": None,
         }
         final_state = await medical_agent_graph.ainvoke(state)
 
@@ -643,9 +602,9 @@ async def voice_diagnosis(
                     input_summary=symptoms_text[:2000],
                     output_summary=full_report[:2000],
                     urgency_level=urgency.lower(),
-                    model_name="voice-endpoint-shim",
+                    model_name="medical-agent-graph",
                     model_version="v1",
-                    prompt_version="voice-diagnose-v1",
+                    prompt_version="voice-diagnose-v2",
                 )
             )
             await db.commit()
